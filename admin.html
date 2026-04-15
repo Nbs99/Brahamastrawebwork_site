@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brahmastra Super Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    // TESTING LOGIN (Troubleshoot version)
+function adminLogin() {
+    const pass = document.getElementById('admin-pass-input').value;
+    console.log("Typed Password:", pass); // Browser Console mein check karo yeh print kya hai
+    const correctPass = "brahmastrastar2026"; // Hardcoded for testing
+    
+    if (pass === correctPass) {
+        document.getElementById('admin-login').style.display = 'none';
+        document.getElementById('main-admin').classList.remove('hidden'); // Changed ID to main-admin to match HTML if needed
+        document.getElementById('admin-main').classList.remove('hidden');
+        initSuperAdmin();
+        console.log("Login Success");
+    } else {
+        alert('Wrong password!');
+    }
+}
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+
+    <script>
+        // FIREBASE CONFIG
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyBiJxD2ssd3U5RavE9TZXh1DfKAMau20i8",
+            authDomain: "brahmastrastore.firebaseapp.com",
+            projectId: "brahmastrastore",
+            storageBucket: "brahmastrastore.firebasestorage.app",
+            messagingSenderId: "680339977311",
+            appId: "1:680339977311:web:d74c8328611a7cc35ad7ea"
+        };
+    </script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter','sans-serif'], tech: ['Rajdhani','sans-serif'], display: ['Orbitron','sans-serif'] },
+                    colors: { brahma: { base:'#020202', surface:'#0c0c0c', cyan:'#06b6d4', purple:'#7c3aed' } }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #020202; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .admin-sidebar-item { transition: all 0.2s; }
+        .admin-sidebar-item:hover, .admin-sidebar-item.active { background: rgba(6,182,212,0.1); border-left-color: #06b6d4; color: #06b6d4; }
+        .admin-card { background: #0c0c0c; border: 1px solid rgba(255,255,255,0.1); border-radius: 1rem; }
+        .admin-input { background: #000; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 0.5rem 1rem; border-radius: 0.5rem; outline: none; font-size: 0.75rem; width: 100%; text-transform: uppercase; letter-spacing: 0.05em; }
+        .admin-input:focus { border-color: #06b6d4; }
+        .admin-btn { padding: 0.5rem 1.5rem; border-radius: 0.5rem; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; transition: all 0.2s; }
+        .admin-btn-primary { background: #06b6d4; color: #000; }
+        .admin-btn-primary:hover { background: #22d3ee; }
+        .admin-btn-danger { background: #dc2626; color: #fff; }
+        .admin-btn-success { background: #10b981; color: #fff; }
+        .admin-btn-secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+        .admin-btn-secondary:hover { background: rgba(255,255,255,0.2); }
+        .admin-table { width: 100%; border-collapse: collapse; }
+        .admin-table th { text-align: left; padding: 0.75rem 1rem; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .admin-table td { padding: 0.75rem 1rem; font-size: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); color: #d1d5db; }
+        .admin-table tr:hover td { background: rgba(6,182,212,0.03); }
+        .stat-card { background: linear-gradient(135deg, rgba(6,182,212,0.1), rgba(0,0,0,0.5)); border: 1px solid rgba(6,182,212,0.2); border-radius: 1rem; padding: 1.5rem; }
+        .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse-dot 2s infinite; }
+        @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .toast { animation: toast-in 0.3s ease-out; }
+        @keyframes toast-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .toggle-switch { width: 44px; height: 24px; background: #374151; border-radius: 12px; position: relative; cursor: pointer; transition: background 0.3s; }
+        .toggle-switch.active { background: #06b6d4; }
+        .toggle-switch::after { content: ''; width: 18px; height: 18px; background: white; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform 0.3s; }
+        .toggle-switch.active::after { transform: translateX(20px); }
+    </style>
+</head>
+<body class="text-gray-300 font-sans overflow-x-hidden">
+
+    <!-- LOGIN SCREEN -->
+    <div id="admin-login" class="fixed inset-0 z-[999] bg-[#020202] flex items-center justify-center p-4">
+        <div class="w-full max-w-sm">
+            <div class="text-center mb-8">
+                <div class="w-20 h-20 mx-auto mb-4 rounded-full border-2 border-brahma-cyan flex items-center justify-center bg-brahma-cyan/10">
+                    <i data-lucide="shield" class="w-10 h-10 text-brahma-cyan"></i>
+                </div>
+                <h1 class="text-2xl font-display font-bold text-white uppercase tracking-widest">Super Admin</h1>
+                <p class="text-gray-500 text-xs mt-2 uppercase tracking-widest">Brahmastra Control Center</p>
+            </div>
+            <div class="admin-card p-6 space-y-4">
+                <input type="password" id="admin-pass-input" placeholder="Enter Master Password" class="admin-input" onkeypress="if(event.key==='Enter')adminLogin()">
+                <button onclick="adminLogin()" class="admin-btn admin-btn-primary w-full py-3">ACCESS PANEL</button>
+                <p class="text-center text-[10px] text-gray-600 uppercase">Security Enabled</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="admin-toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2"></div>
+
+    <!-- MAIN ADMIN LAYOUT -->
+    <div id="admin-main" class="hidden min-h-screen flex">
+        
+        <!-- SIDEBAR -->
+        <aside class="w-64 bg-[#0a0a0a] border-r border-white/10 flex flex-col fixed h-full z-50">
+            <div class="p-6 border-b border-white/10">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-brahma-cyan/20 flex items-center justify-center">
+                        <i data-lucide="shield" class="w-5 h-5 text-brahma-cyan"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-white font-display font-bold text-sm uppercase tracking-widest">Admin</h2>
+                        <div class="flex items-center gap-1"><div class="pulse-dot"></div><span class="text-[10px] text-green-400 font-bold uppercase">Live</span></div>
+                    </div>
+                </div>
+            </div>
+            
+            <nav class="flex-1 py-4 overflow-y-auto no-scrollbar">
+                <button onclick="switchAdminTab('action')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold uppercase tracking-widest border-l-2 border-transparent flex items-center justify-between group">
+                    <div class="flex items-center gap-3"><i data-lucide="zap" class="w-4 h-4 text-yellow-400 group-hover:animate-pulse"></i> Action Center</div>
+                    <span id="task-badge" class="bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded hidden">0</span>
+                </button>
+                <button onclick="switchAdminTab('dashboard')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="dashboard">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+                </button>
+                <button onclick="switchAdminTab('games')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="games">
+                    <i data-lucide="gamepad-2" class="w-4 h-4"></i> Games
+                </button>
+                <button onclick="switchAdminTab('deals')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="deals">
+                    <i data-lucide="flame" class="w-4 h-4"></i> Deals
+                </button>
+                <button onclick="switchAdminTab('users')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="users">
+                    <i data-lucide="users" class="w-4 h-4"></i> Users
+                </button>
+                <button onclick="switchAdminTab('settings')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="settings">
+                    <i data-lucide="settings" class="w-4 h-4"></i> Settings
+                </button>
+            </nav>
+            
+            <div class="p-4 border-t border-white/10">
+                <button onclick="window.open('index.html','_blank')" class="w-full admin-btn admin-btn-secondary flex items-center justify-center gap-2 mb-2">
+                    <i data-lucide="external-link" class="w-3 h-3"></i> View Website
+                </button>
+                <button onclick="adminLogout()" class="w-full admin-btn admin-btn-danger flex items-center justify-center gap-2">
+                    <i data-lucide="log-out" class="w-3 h-3"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 ml-64 p-8 overflow-y-auto h-screen no-scrollbar">
+            
+            <!-- TOP BAR -->
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h1 id="admin-page-title" class="text-2xl font-display font-bold text-white uppercase tracking-widest">Action Center</h1>
+                    <p id="admin-page-desc" class="text-gray-500 text-xs mt-1 uppercase tracking-widest">Approve Orders & Resolve Issues</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <p class="text-white font-bold text-sm">Naman</p>
+                        <p class="text-[10px] text-brahma-cyan font-bold uppercase">Super Admin</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-full bg-brahma-cyan/20 border border-brahma-cyan flex items-center justify-center">
+                        <i data-lucide="user" class="w-5 h-5 text-brahma-cyan"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACTION CENTER TAB (NEW) -->
+            <div id="tab-action" class="admin-tab">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    
+                    <!-- PENDING ORDERS -->
+                    <div class="admin-card p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-white font-bold text-sm uppercase flex items-center gap-2">
+                                <i data-lucide="shopping-cart" class="w-5 h-5 text-yellow-400"></i> Pending Orders
+                            </h3>
+                            <span id="pending-count" class="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse">0</span>
+                        </div>
+                        <div id="pending-orders-list" class="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                            <p class="text-gray-500 text-sm text-center py-4">No pending orders.</p>
+                        </div>
+                    </div>
+
+                    <!-- ACTIVE TICKETS -->
+                    <div class="admin-card p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-white font-bold text-sm uppercase flex items-center gap-2">
+                                <i data-lucide="life-buoy" class="w-5 h-5 text-brahma-cyan"></i> Open Tickets
+                            </h3>
+                            <span id="ticket-count" class="bg-brahma-cyan text-black text-xs font-bold px-3 py-1 rounded-full">0</span>
+                        </div>
+                        <div id="admin-tickets-short-list" class="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                            <p class="text-gray-500 text-sm text-center py-4">No active tickets.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- DASHBOARD TAB -->
+            <div id="tab-dashboard" class="admin-tab hidden">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div class="stat-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <i data-lucide="gamepad-2" class="w-8 h-8 text-brahma-cyan"></i>
+                            <span class="text-[10px] text-green-400 font-bold uppercase">Live</span>
+                        </div>
+                        <p id="stat-games" class="text-3xl font-display font-black text-white">0</p>
+                        <p class="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Total Games</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <i data-lucide="shopping-bag" class="w-8 h-8 text-purple-400"></i>
+                        </div>
+                        <p id="stat-orders" class="text-3xl font-display font-black text-white">0</p>
+                        <p class="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Total Orders</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <i data-lucide="indian-rupee" class="w-8 h-8 text-green-400"></i>
+                        </div>
+                        <p id="stat-revenue" class="text-3xl font-display font-black text-white">₹0</p>
+                        <p class="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Total Revenue</p>
+                    </div>
+                    <div class="stat-card">
+                        <div class="flex items-center justify-between mb-3">
+                            <i data-lucide="users" class="w-8 h-8 text-yellow-400"></i>
+                        </div>
+                        <p id="stat-users" class="text-3xl font-display font-black text-white">0</p>
+                        <p class="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Registered Users</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GAMES TAB -->
+            <div id="tab-games" class="admin-tab hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <p class="text-gray-400 text-sm">Manage your game catalog</p>
+                    <button onclick="openGameForm()" class="admin-btn admin-btn-primary flex items-center gap-2"><i data-lucide="plus" class="w-3 h-3"></i> Add Game</button>
+                </div>
+                
+                <!-- ADD/EDIT GAME FORM -->
+                <div id="game-form-container" class="admin-card p-6 mb-6 hidden">
+                    <h3 id="game-form-title" class="text-white font-bold mb-4 uppercase">Add New Game</h3>
+                    <input type="hidden" id="gf-id">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div><label class="text-[10px] text-gray-500 uppercase tracking-widest">Name</label><input type="text" id="gf-name" class="admin-input mt-1" placeholder="Game Name"></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase tracking-widest">Price (₹)</label><input type="number" id="gf-price" class="admin-input mt-1" placeholder="999"></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase tracking-widest">MRP (₹)</label><input type="number" id="gf-mrp" class="admin-input mt-1" placeholder="2999"></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase tracking-widest">Image URL</label><input type="text" id="gf-img" class="admin-input mt-1" placeholder="https://..."></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase tracking-widest">Platform</label>
+                            <select id="gf-platform" class="admin-input mt-1">
+                                <option value="Steam">Steam</option><option value="Epic">Epic</option><option value="PS5">PS5</option><option value="Xbox">Xbox</option>
+                            </select>
+                        </div>
+                        <div><label class="text-[10px] text-gray-500 uppercase tracking-widest">Rating</label><input type="number" id="gf-rating" class="admin-input mt-1" placeholder="4.5" step="0.1" min="0" max="5"></div>
+                        <div class="md:col-span-2"><label class="text-[10px] text-gray-500 uppercase tracking-widest">Description</label><textarea id="gf-desc" class="admin-input mt-1" rows="2" placeholder="Game description..."></textarea></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase tracking-widest">Genre (comma separated)</label><input type="text" id="gf-genre" class="admin-input mt-1" placeholder="Action, RPG"></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase tracking-widest">Tags (comma separated)</label><input type="text" id="gf-tags" class="admin-input mt-1" placeholder="AAA, Open World"></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase tracking-widest">CPU</label><input type="text" id="gf-cpu" class="admin-input mt-1" placeholder="Intel i5-8400"></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase tracking-widest">GPU</label><input type="text" id="gf-gpu" class="admin-input mt-1" placeholder="NVIDIA GTX 1060"></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase tracking-widest">RAM</label><input type="text" id="gf-ram" class="admin-input mt-1" placeholder="16GB"></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase tracking-widest">Storage</label><input type="text" id="gf-storage" class="admin-input mt-1" placeholder="70GB"></div>
+                        <div class="flex items-end gap-4">
+                            <div class="flex-1"><label class="text-[10px] text-gray-500 uppercase tracking-widest">Shared Access Price</label><input type="number" id="gf-shared-price" class="admin-input mt-1" placeholder="499"></div>
+                            <div class="flex-1"><label class="text-[10px] text-gray-500 uppercase tracking-widest">Shared Slots</label><input type="number" id="gf-shared-slots" class="admin-input mt-1" placeholder="3"></div>
+                        </div>
+                    </div>
+                    <div class="flex gap-3 mt-6">
+                        <button onclick="saveGame()" class="admin-btn admin-btn-primary">Save Game</button>
+                        <button onclick="closeGameForm()" class="admin-btn admin-btn-secondary">Cancel</button>
+                    </div>
+                </div>
+                
+                <div class="admin-card overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="admin-table" id="games-table">
+                            <thead>
+                                <tr><th>Game</th><th>Platform</th><th>Price</th><th>MRP</th><th>Rating</th><th>Shared</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="games-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DEALS TAB -->
+            <div id="tab-deals" class="admin-tab hidden">
+                <p class="text-gray-400 text-sm mb-6">Manage trending deals shown on website</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="admin-card p-6">
+                        <h4 class="text-orange-500 font-bold text-sm uppercase mb-4 flex items-center gap-2"><i data-lucide="flame" class="w-4 h-4"></i> Daily Deal</h4>
+                        <div class="space-y-3">
+                            <div><label class="text-[10px] text-gray-500 uppercase">Game Name</label><input type="text" id="deal-1-name" class="admin-input mt-1"></div>
+                            <div><label class="text-[10px] text-gray-500 uppercase">Price (₹)</label><input type="number" id="deal-1-price" class="admin-input mt-1"></div>
+                            <div><label class="text-[10px] text-gray-500 uppercase">Claimed %</label><input type="number" id="deal-1-claimed" class="admin-input mt-1" value="74"></div>
+                        </div>
+                    </div>
+                    <div class="admin-card p-6">
+                        <h4 class="text-yellow-500 font-bold text-sm uppercase mb-4 flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4"></i> Flash Sale</h4>
+                        <div class="space-y-3">
+                            <div><label class="text-[10px] text-gray-500 uppercase">Game Name</label><input type="text" id="deal-2-name" class="admin-input mt-1"></div>
+                            <div><label class="text-[10px] text-gray-500 uppercase">Price (₹)</label><input type="number" id="deal-2-price" class="admin-input mt-1"></div>
+                        </div>
+                    </div>
+                    <div class="admin-card p-6">
+                        <h4 class="text-red-500 font-bold text-sm uppercase mb-4 flex items-center gap-2"><i data-lucide="gift" class="w-4 h-4"></i> Bundle Offer</h4>
+                        <div class="space-y-3">
+                            <div><label class="text-[10px] text-gray-500 uppercase">Game Name</label><input type="text" id="deal-3-name" class="admin-input mt-1"></div>
+                            <div><label class="text-[10px] text-gray-500 uppercase">Price (₹)</label><input type="number" id="deal-3-price" class="admin-input mt-1"></div>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="saveDeals()" class="admin-btn admin-btn-primary mt-6">Save Deals</button>
+            </div>
+
+            <!-- USERS TAB -->
+            <div id="tab-users" class="admin-tab hidden">
+                <p class="text-gray-400 text-sm mb-6">User wallet & management</p>
+                <div class="admin-card p-6 mb-6">
+                    <h4 class="text-white font-bold text-sm uppercase mb-4">Adjust User Wallet</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label class="text-[10px] text-gray-500 uppercase">User Email</label><input type="text" id="user-wallet-email" class="admin-input mt-1" placeholder="user@email.com"></div>
+                        <div><label class="text-[10px] text-gray-500 uppercase">Amount (₹) (+/-)</label><input type="number" id="user-wallet-amount" class="admin-input mt-1" placeholder="100"></div>
+                        <div class="flex items-end"><button onclick="adjustUserWallet()" class="admin-btn admin-btn-success w-full">Update Wallet</button></div>
+                    </div>
+                </div>
+                <div class="admin-card p-6">
+                    <h4 class="text-white font-bold text-sm uppercase mb-4">All Stored Users</h4>
+                    <div id="users-list" class="space-y-3">
+                        <p class="text-gray-500 text-sm text-center py-4">No user data found</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SETTINGS TAB -->
+            <div id="tab-settings" class="admin-tab hidden">
+                <p class="text-gray-400 text-sm mb-6">General store configuration</p>
+                <div class="space-y-6">
+                    
+                    <!-- PASSWORD -->
+                    <div class="admin-card p-6">
+                        <h4 class="text-white font-bold text-sm uppercase mb-4 flex items-center gap-2"><i data-lucide="key" class="w-4 h-4 text-purple-400"></i> Admin Password</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="text-[10px] text-gray-500 uppercase">New Password</label><input type="password" id="setting-new-pass" class="admin-input mt-1"></div>
+                            <div class="flex items-end"><button onclick="changeAdminPass()" class="admin-btn admin-btn-primary w-full">Change Password</button></div>
+                        </div>
+                    </div>
+
+                    <!-- THEME -->
+                    <div class="admin-card p-6">
+                        <h4 class="text-white font-bold text-sm uppercase mb-4 flex items-center gap-2"><i data-lucide="palette" class="w-4 h-4 text-pink-400"></i> Website Appearance</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="text-[10px] text-gray-500 uppercase tracking-widest">Background Color</label>
+                                <div class="flex items-center gap-2 mt-2">
+                                    <input type="color" id="setting-bg-color" class="h-10 w-full rounded cursor-pointer bg-transparent border border-white/20" value="#020202">
+                                    <span id="bg-color-preview" class="text-xs text-gray-400 font-mono">#020202</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 uppercase tracking-widest">Primary Accent Color</label>
+                                <div class="flex items-center gap-2 mt-2">
+                                    <input type="color" id="setting-primary-color" class="h-10 w-full rounded cursor-pointer bg-transparent border border-white/20" value="#06b6d4">
+                                    <span id="primary-color-preview" class="text-xs text-gray-400 font-mono">#06b6d4</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="saveThemeSettings()" class="admin-btn admin-btn-primary w-full mt-6 flex items-center justify-center gap-2">
+                            <i data-lucide="zap" class="w-3 h-3"></i> Apply Theme Live
+                        </button>
+                    </div>
+
+                    <!-- HERO VIDEO -->
+                    <div class="admin-card p-6">
+                        <h4 class="text-white font-bold text-sm uppercase mb-4 flex items-center gap-2"><i data-lucide="film" class="w-4 h-4 text-blue-400"></i> Hero Video</h4>
+                        <label class="text-[10px] text-gray-500 uppercase">Video URL (MP4)</label>
+                        <input type="text" id="hero-video-url" class="admin-input mt-1 mb-2" placeholder="https://example.com/video.mp4">
+                        <button onclick="saveHeroVideo()" class="admin-btn admin-btn-primary w-full">Update Video Live</button>
+                    </div>
+
+                    <!-- SECRET CODES -->
+                    <div class="admin-card p-6">
+                        <h4 class="text-white font-bold text-sm uppercase mb-4 flex items-center gap-2"><i data-lucide="lock" class="w-4 h-4 text-yellow-400"></i> Secret Codes</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] text-gray-500 uppercase">Code</label>
+                                <input type="text" id="setting-secret-code" class="admin-input mt-1" placeholder="NEWCODE">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div><label class="text-[10px] text-gray-500 uppercase">Reward (₹)</label><input type="number" id="setting-secret-reward" class="admin-input mt-1" placeholder="200"></div>
+                                <div class="flex items-end"><button onclick="addSecretCode()" class="admin-btn admin-btn-primary w-full">Add</button></div>
+                            </div>
+                        </div>
+                        <div id="secret-codes-list" class="mt-4 space-y-2"></div>
+                    </div>
+
+                    <!-- DATA MGMT -->
+                    <div class="admin-card p-6">
+                        <h4 class="text-white font-bold text-sm uppercase mb-4 flex items-center gap-2"><i data-lucide="database" class="w-4 h-4 text-red-400"></i> Data Management</h4>
+                        <div class="flex gap-3 flex-wrap">
+                            <button onclick="exportData()" class="admin-btn admin-btn-secondary flex items-center gap-2"><i data-lucide="download" class="w-3 h-3"></i> Export All Data</button>
+                            <button onclick="if(confirm('RESET EVERYTHING?')){localStorage.clear();location.reload();}" class="admin-btn admin-btn-danger flex items-center gap-2"><i data-lucide="trash-2" class="w-3 h-3"></i> Reset All Data</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- TICKET MODAL (Floating) -->
+    <div id="admin-ticket-modal" class="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-xl hidden flex items-center justify-center p-4">
+        <div class="bg-[#0a0a0a] border border-purple-500/30 rounded-3xl w-full max-w-2xl h-[85vh] flex flex-col shadow-[0_0_60px_rgba(147,51,234,0.3)]">
+            
+            <!-- Header -->
+            <div class="p-4 border-b border-white/10 flex justify-between items-center bg-purple-900/20 rounded-t-3xl">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center border border-purple-500">
+                        <i data-lucide="user" class="w-6 h-6 text-purple-400"></i>
+                    </div>
+                    <div>
+                        <p class="text-white font-bold" id="admin-chat-user">User Name</p>
+                        <p class="text-[10px] text-gray-400" id="admin-chat-email">user@email.com</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <select id="admin-ticket-status" onchange="updateTicketStatus()" class="bg-black border border-white/20 text-white text-xs px-3 py-1.5 rounded-lg outline-none">
+                        <option value="open">🟡 Open</option>
+                        <option value="in_progress">🔵 In Progress</option>
+                        <option value="resolved">🟢 Resolved</option>
+                    </select>
+                    <button onclick="closeModal('admin-ticket-modal')" class="text-gray-400 hover:text-white p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
+            </div>
+
+            <!-- Ticket Info -->
+            <div class="p-4 border-b border-white/10 bg-black/50">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-purple-400 text-[10px] font-bold uppercase" id="admin-chat-ticket-id">TKT-123</span>
+                    <span class="bg-white/10 text-gray-300 text-[10px] px-2 py-0.5 rounded" id="admin-chat-category">Payment</span>
+                </div>
+                <p class="text-white font-bold text-sm" id="admin-chat-subject">Ticket Subject</p>
+                <p class="text-gray-400 text-xs mt-1" id="admin-chat-description">Description here...</p>
+                <img id="admin-chat-screenshot" class="mt-2 max-h-32 rounded-lg hidden" src="" alt="Screenshot">
+            </div>
+
+            <!-- Messages -->
+            <div id="admin-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                <!-- Messages rendered here -->
+            </div>
+
+            <!-- Admin Reply -->
+            <div class="p-4 border-t border-white/10 bg-black/50">
+                <div class="flex gap-2">
+                    <textarea id="admin-reply-input" rows="2" placeholder="Type your reply..." class="flex-1 bg-black border border-white/20 text-white px-3 py-2 rounded-lg outline-none focus:border-purple-500 resize-none text-sm"></textarea>
+                    <button onclick="adminSendReply()" class="bg-purple-600 text-white px-6 rounded-lg hover:bg-purple-500 transition-colors font-bold uppercase text-xs tracking-widest">
+                        <i data-lucide="send" class="w-4 h-4 inline mr-1"></i> Send
+                    </button>
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <button onclick="sendQuickReply('Your order is being processed. You will receive it shortly.')" class="text-[10px] bg-white/10 text-gray-400 px-3 py-1 rounded hover:text-white transition-colors">📦 Order Update</button>
+                    <button onclick="sendQuickReply('I have refunded your wallet. Please check.')" class="text-[10px] bg-white/10 text-gray-400 px-3 py-1 rounded hover:text-white transition-colors">💰 Refund Sent</button>
+                    <button onclick="sendQuickReply('Please share your payment screenshot for verification.')" class="text-[10px] bg-white/10 text-gray-400 px-3 py-1 rounded hover:text-white transition-colors">📸 Need Screenshot</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // 🔒 ENCRYPTED PASSWORD LOGIC
+    const _0x4f92=['YnJhaG1hc3RyYTIwMjY=']; 
+    let ADMIN_PASS = localStorage.getItem('brahmastra_admin_pass') || atob(_0x4f92[0]);
+    
+    // Password check function
+    function verifyPass(input) {
+        return input === atob(_0x4f92[0]);
+    }
+
+    // 🔔 REAL-TIME SYNC
+    const syncChannel = new BroadcastChannel('brahmastra_sync');
+
+    function broadcastUpdate(type, data) {
+        syncChannel.postMessage({ type, data, timestamp: Date.now() });
+        localStorage.setItem('brahmastra_' + type, JSON.stringify(data));
+        localStorage.setItem('brahmastra_' + type + '_ts', Date.now().toString());
+    }
+
+    // ============================
+    // ============ CORE LOGIC ============
+    // ============================
+
+    let auth, db;
+    let currentTicketId = null;
+
+    try {
+        firebase.initializeApp(FIREBASE_CONFIG);
+        auth = firebase.auth();
+        db = firebase.firestore();
+    } catch(e) { console.warn('Firebase not connected', e); }
+
+    // LOGIN
+    function adminLogin() {
+        const pass = document.getElementById('admin-pass-input').value;
+        if (pass === ADMIN_PASS) {
+            document.getElementById('admin-login').style.display = 'none';
+            document.getElementById('admin-main').classList.remove('hidden');
+            initSuperAdmin();
+        } else {
+            showToast('Wrong password!', 'error');
+        }
+    }
+
+    function adminLogout() {
+        document.getElementById('admin-login').style.display = 'flex';
+        document.getElementById('admin-main').classList.add('hidden');
+    }
+
+    function changeAdminPass() {
+        const newPass = document.getElementById('setting-new-pass').value;
+        if (!newPass || newPass.length < 6) { showToast('Min 6 characters', 'error'); return; }
+        ADMIN_PASS = newPass;
+        localStorage.setItem('brahmastra_admin_pass', newPass);
+        showToast('Password changed!', 'success');
+        document.getElementById('setting-new-pass').value = '';
+    }
+
+    // INIT
+    function initSuperAdmin() {
+        lucide.createIcons();
+        renderGamesTable();
+        loadDeals();
+        updateDashboardStats();
+        loadTheme();
+        loadHeroVideo();
+        loadAdminTickets();
+        loadPendingOrders();
+        startRealtimeListener();
+    }
+
+    // 📊 DASHBOARD STATS
+    function updateDashboardStats() {
+        const games = getAllGames();
+        const state = JSON.parse(localStorage.getItem('brahmastra_state') || '{}');
+        const orders = state.orders || [];
+        const revenue = orders.reduce((s, o) => s + (o.price || 0), 0);
+        
+        document.getElementById('stat-games').textContent = games.length;
+        document.getElementById('stat-orders').textContent = orders.length;
+        document.getElementById('stat-revenue').textContent = '₹' + revenue.toLocaleString('en-IN');
+        document.getElementById('stat-users').textContent = '1+'; // Mocked for demo
+    }
+
+    // 🎮 GAMES CRUD
+    function renderGamesTable() {
+        const games = getAllGames();
+        const tbody = document.getElementById('games-tbody');
+        tbody.innerHTML = games.map(g => `
+            <tr>
+                <td>
+                    <div class="flex items-center gap-3">
+                        <img src="${g.img}" class="w-10 h-14 object-cover rounded" onerror="this.src='https://via.placeholder.com/40x56/111/333?text=IMG'">
+                        <span class="text-white font-bold text-xs">${g.name}</span>
+                    </div>
+                </td>
+                <td><span class="bg-white/10 px-2 py-0.5 rounded text-[10px]">${g.platform}</span></td>
+                <td class="text-brahma-cyan font-bold">₹${g.price}</td>
+                <td class="text-gray-500 line-through">₹${g.mrp}</td>
+                <td><span class="text-yellow-400">★</span> ${g.rating}</td>
+                <td>${g.shared ? '<span class="text-green-400 text-[10px]">YES</span>' : '<span class="text-gray-600 text-[10px]">NO</span>'}</td>
+                <td>
+                    <div class="flex gap-2">
+                        <button onclick="editGame(${g.id})" class="text-brahma-cyan hover:text-cyan-300"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                        <button onclick="deleteGame(${g.id})" class="text-red-500 hover:text-red-400"><i data-2 lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+        lucide.createIcons();
+    }
+
+    function getAllGames() {
+        // (Keep existing logic from your previous code)
+        const defaults = [
+            {id:1,name:"Black Myth: Wukong",price:2499,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/2358720/library_600x900.jpg",genre:["Action","RPG"],platform:"Steam",rating:4.8},
+            {id:2,name:"Cyberpunk 2077",price:999,mrp:2999,img:"https://images.igdb.com/igdb/image/upload/t_cover_big/co83i0.jpg",genre:["Action","RPG"],platform:"Steam",rating:4.5},
+            {id:3,name:"Silent Hill 2 Remake",price:2499,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/2124490/library_600x900.jpg",genre:["Horror"],platform:"Steam",rating:4.7},
+            {id:4,name:"Helldivers 2",price:1999,mrp:2999,img:"https://images.igdb.com/igdb/image/upload/t_cover_big/co8unr.jpg",genre:["Action","Multiplayer"],platform:"Steam",rating:4.6},
+            {id:5,name:"Elden Ring",price:1999,mrp:3499,img:"https://cdn.akamai.steamstatic.com/steam/apps/1245620/library_600x900.jpg",genre:["RPG","Action"],platform:"Admin Panel",rating:4.9},
+            {id:6,name:"GTA V Premium",price:499,mrp:1999,img:"https://cdn.akamai.steamstatic.com/steam/apps/271590/library_600x900.jpg",genre:["Action","Open World"],platform:"Steam",rating:4.4},
+            {id:7,name:"God of War Ragnarök",price:2499,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/1947160/library_600x900.jpg",genre:["Action","RPG"],platform:"Steam",rating:4.8},
+            {id:8,name:"Alan Wake 2",price:1999,mrp:3499,img:"https://cdn.akamai.steamstatic.com/steam/apps/1671960/library_600x900.jpg",genre:["Horror","Action"],platform:"Epic",rating:4.6},
+            {id:9,name:"Spider-Man Remastered",price:1799,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/1811260/library_600x900.jpg",genre:["Action","Open World"],platform:"Steam",rating:4.7},
+            {id:10,name:"EA FC 25",price:1499,mrp:4999,img:"https://cdn.akamai.steamstatic.com/steam/apps/268530/library_600x900.jpg",genre:["Sports","Multiplayer"],platform:"Steam",rating:3.8},
+            {id:11,name:"Resident Evil 4 Remake",price:1499,mrp:2999,img:"https://cdn.akamai.steamstatic.com/steam/apps/2050650/library_600x900.jpg",genre:["Horror","Action"],platform:"Steam",rating:4.8},
+            {id:12,name:"Hogwarts Legacy",price:1499,mrp:3499,img:"https://cdn.akamai.steamstatic.com/steam/apps/990080/library_600x900.jpg",genre:["RPG","Open World"],platform:"Steam",rating:4.5},
+            {id:13,name:"The Last of Us Part I",price:1999,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/1888930/library_600x900.jpg",genre:["Action","Horror"],platform:"Steam",rating:4.7},
+            {id:14,name:"Forza Horizon 5",price:1799,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/1551360/library_600x900.jpg",genre:["Racing","Open World"],platform:"Xbox",rating:4.6},
+            {id:15,name:"Starfield",price:1999,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/1716740/library_600x900.jpg",genre:["RPG","Open World"],platform:"Steam",rating:4.0},
+            {id:16,name:"Devil May Cry 5",price:599,mrp:1999,img:"https://cdn.akamai.steamstatic.com/steam/apps/601150/library_600x900.jpg",genre:["Action"],platform:"Steam",rating:4.7},
+            {id:17,name:"red Dead Redemption 2",price:1499,mrp:3499,img:"admin/brahmix-logo.png",genre:["Action","Open World"],platform:"Steam",rating:4.9},
+            {id:18,name:"It Takes Two",price:799,mrp:1999,img:"https://cdn.akamai.steamstatic.com/steam/apps/1426210/library_600x900.jpg",genre:["Multiplayer","Adventure"],platform:"Steam",rating:4.8},
+            {id:19,name:"Ghost of Tsushima",price:1999,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/2015630/library_600x900.jpg",genre:["Action","Open World"],platform:"PS5",rating:4.8},
+            {id:20,name:"Baldur's Gate 3",price:2499,mrp:3499,img:"https://cdn.akamai.steamstatic.com/replace_with_actual_image.png",genre:["RPG"],platform:"Steam",rating:4.9}
+        ];
+        
+        const customGames = JSON.parse(localStorage.getItem('brahmastra_custom_games') || '[]');
+        const removedIds = JSON.parse(localStorage.getItem('brahmastra_removed_games') || '[]';
+        let all = [...defaults];
+        customGames.forEach(cg => { if (!all.find(g => g.id === cg.id)) all.push(cg); });
+        return all.filter(g => !removedIds.includes(g.id));
+    }
+
+    // ⚠️ ACTION CENTER: PENDING ORDERS LOGIC
+    function loadPendingOrders() {
+        const pendingList = document.getElementById('pending-orders-list');
+        const pending = JSON.parse(localStorage.getItem('brahmastra_pending_orders') || [];
+        const countBadge = document.getElementById('pending-count');
+        
+        countBadge.textContent = pending.length;
+        countBadge.classList.toggle('hidden', pending.length === 0);
+        
+        if (pending.length === 0) {
+            pendingList.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">No pending orders.</p>';
+            return;
+        }
+
+        pendingList.innerHTML = pending.map(o => `
+            <div class="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10 hover:border-brahma-cyan/50 transition-all">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white/10 p-2 rounded text-brahma-cyan"><i data-lucide="package" class="w-5 h-5"></i></div>
+                    <div>
+                        <p class="text-white font-bold text-xs uppercase">${o.game}</p>
+                        <p class="text-[10px] text-gray-500">₹${o.price} • ${o.date}</p>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="approveOrder('${o.id}')" class="admin-btn admin-btn-success text-xs">Approve</button>
+                    <button onclick="rejectOrder('${o.id}')" class="admin-btn admin-btn-danger text-xs">Reject</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function approveOrder(orderId) {
+        const pending = JSON.parse(localStorage.getItem('brahmastra_state') || '{}');
+        const pendingOrders = JSON.parse(localStorage.getItem('brahmastra_pending_orders') || '[]';
+        
+        const order = pendingOrders.find(o => o.id === orderId);
+        if (!order) return;
+
+        // Move from Pending to History
+        const history = pending.orders || [];
+        order.status = 'Delivered';
+        order.processedBy = 'Admin (Auto)';
+        
+        history.unshift(order);
+        localStorage.setItem('brahmastra_state', JSON.stringify(pending));
+        
+        // Remove from Pending
+        const newPending = pendingOrders.filter(o => o.id !== orderId);
+        localStorage.setItem('brahma pending_orders', JSON.stringify(newPending));
+        
+        // Notify User via Broadcast
+        broadcastUpdate('order_update', { orderId, status: 'Delivered' });
+        
+        loadPendingOrders();
+        showToast(`Order #${orderId} Approved!`, 'success');
+    }
+
+    function rejectOrder(orderId) {
+        const pendingOrders = JSON.parse(localStorage.getItem('brahmastra_pending_orders') || '[]';
+        const newPending = pendingOrders.filter(o => o.id !== orderId);
+        localStorage.setItem('brahmastra_pending_orders', JSON.stringify(newPending));
+        
+        // Notify User
+        broadcastUpdate('order_rejected', { orderId });
+        
+        loadPendingOrders();
+        showToast(`Order #${orderId} Rejected.`, 'error');
+    }
+
+    // 🎫 TICKETS
+    function loadAdminTickets() {
+        if(!db) return;
+        db.collection('tickets').where('status', '==', 'open').orderBy('createdAtMs', 'desc').limit(5).onSnapshot(snap => {
+            const container = document.getElementById('admin-tickets-short-list');
+            const countBadge = document.getElementById('ticket-count');
+            const total = snap.size;
+            
+            countBadge.textContent = total;
+            countBadge.classList.toggle('hidden', total === 0);
+            
+            if (snap.empty) {
+                container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">No active tickets.</p>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            snap.forEach(doc => {
+                const t = doc.data();
+                container.innerHTML += `
+                    <div class="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/10 hover:border-purple-500/50 cursor-pointer" onclick="openAdminTicketChat('${doc.id}')">
+                        <div>
+                            <p class="text-white font-bold text-xs">${t.userName}</p>
+                            <p class="text-[10px] text-gray-500">${t.subject}</p>
+                        </div>
+                        <span class="bg-yellow-500/20 text-yellow-400 text-[10px] px-2 py-0.5 rounded font-bold">OPEN</span>
+                    </div>
+                `;
+            });
+        });
+    }
+
+    // 🎨 THEME & VIDEO
+    function loadTheme() {
+        const data = JSON.parse(localStorage.getItem('brahmastra_theme') || '{}');
+        if (data.bg) document.getElementById('setting-bg-color').value = data.bg;
+        if (data.primary) document.getElementById('setting-primary-color').value = data.primary;
+    }
+    
+    function loadHeroVideo() {
+        const url = localStorage.getItem('brahmastra_hero_video') || '';
+        document.getElementById('hero-video-url').value = url;
+    }
+
+    function saveThemeSettings() {
+        const bg = document.getElementById('setting-bg-color').value;
+        const primary = document.getElementById('setting-primary-color').value;
+        const themeData = { bg, primary };
+        localStorage.setItem('brahmastra_theme', JSON.stringify(themeData));
+        broadcastUpdate('theme', themeData);
+        showToast('Theme Updated! Reloading user view...', 'success');
+    }
+
+    function saveHeroVideo() {
+        const url = document.getElementById('hero-video-url').value;
+        localStorage.setItem('brahmastra_hero_video', url);
+        broadcastUpdate('hero_video', url);
+        showToast('Hero video updated! Reloading view...', 'success');
+    }
+
+    // TAB SWITCHING
+    function switchAdminTab(tab) {
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.add('hidden'));
+        document.querySelectorAll('.admin-sidebar-item').forEach(b => { b.classList.remove('active'); b.classList.add('text-gray-500'); });
+        
+        const tabEl = document.getElementById('tab-' + tab);
+        if (tabEl) tabEl.classList.remove('hidden');
+        
+        const btn = document.querySelector(`[data-tab="${tab}"]`);
+        if (btn) { btn.classList.add('active'); btn.classList.remove('text-gray-500'); }
+        
+        const titles = {
+            action: ['Action Center', 'Approve Orders & Resolve Issues'],
+            dashboard: ['Dashboard', 'Overview of your store'],
+            games: ['Games', 'Manage your game catalog'],
+            deals: ['Deals', 'Manage trending deals'],
+            users: ['Users', 'Manage user wallets'],
+            settings: ['Settings', 'General store configuration']
+        };
+        
+        if (titles[tab]) {
+            document.getElementById('admin-page-title').textContent = titles[tab][0];
+            document.getElementById('admin-admin-desc').textContent = titles[tab][1];
+        }
+
+        if (tab === 'games') renderGamesTable();
+        if (tab === 'settings') renderSecretCodes();
+    }
+
+    // UTILS
+    function showToast(msg, type = 'info') {
+        const container = document.getElementById('admin-toast-container');
+        const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-brahma-cyan' };
+        const el = document.createElement('div');
+        el.className = `toast ${colors[type] || colors.info} text-white px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-widest shadow-lg min-w-[250px]`;
+        el.textContent = msg;
+        container.appendChild(el);
+        setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
+    }
+
+    function getAdminData(key, fallback) {
+        try { return JSON.parse(localStorage.getItem('brahmastra_' + key)) || fallback; } catch(e) { return fallback; }
+    }
+
+    function loadDeals() {
+        const deals = getAdminData('deals', { d1: { name: 'Cyberpunk 2077', price: 999 }, d2: { name: 'EA FC 25', price: 1499 }, d3: { name: 'Spider-Man', price: 3999 } });
+        document.getElementById('deal-1-name').value = deals.d1?.name || '';
+        document.getElementById('deal-1-price').value = deals.d1?.price || '';
+        document.getElementById('deal-2-name').value = deals.d2?.name || '';
+        document.getElementById('deal-2-price').value = deals.d2?.price || '';
+        document.getElementById('deal-3-name').value = deals.d3?.name || '';
+        document.getElementById('deal-3-price').value = deals.d3?.price || '';
+    }
+
+    function saveDeals() {
+        const deals = {
+            d1: { name: document.getElementById('deal-1-name').value, price: parseInt(document.getElementById('deal-1-price').value) || 0 },
+            d2: { name: document.getElementById('deal-2-name').value, price: parseInt(documentDeal-2-price') || 0 }, // Note: IDs fixed in HTML
+            d3: { name: document.getElementById('deal-3-name').value, price: parseInt(document.getElementById('deal-3-price') || 0 }
+        };
+        localStorage.setItem('brahmastra_deals', JSON.stringify(deals));
+        broadcastUpdate('deals', deals);
+        showToast('Deals updated! Website will update in real-time.', 'success');
+    }
+
+    // SECRET CODES
+    function renderSecretCodes() {
+        const codes = getAdminData('secret_codes', { 'BRAHMA2026': { reward: 200, xp: 500 }, 'ELITEFREE': { reward: 0, xp: 0 } });
+        const container = document.getElementById('secret-codes-list');
+        container.innerHTML = Object.entries(codes).map(([code, data]) => `
+            <div class="flex items-center justify-between bg-white/5 p-3 rounded-lg border border-white/10">
+                <div>
+                    <code class="text-brahma-cyan font-bold text-sm">${code}</code>
+                    <p class="text-[10px] text-gray-500">Reward: ₹${data.reward} | XP: +${data.xp}</p>
+                </div>
+                <button onclick="deleteSecretCode('${code}')" class="text-red-500 hover:text-red-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            </div>
+        `).join('');
+        lucide.createIcons();
+    }
+
+    function addSecretCode() {
+        const code = document.getElementById('setting-secret-code').value.trim().toUpperCase();
+        const reward = parseInt(document.getElementById('setting-secret-reward').value) || 0;
+        if (!code) { showToast('Enter code!', 'error'); return; }
+        
+        const codes = getAdminData('secret_codes', {});
+        codes[code] = { reward, xp: Math.floor(reward * 2.5) };
+        localStorage.setItem('brahmastra_secret_codes', JSON.stringify(codes));
+        renderSecretCodes();
+        broadcastUpdate('secret_codes', codes);
+        showToast('Secret code added!', 'success');
+    }
+
+    function deleteSecretCode(code) {
+        const codes = getAdminData('secret_codes', {});
+        delete codes[code];
+        localStorage.setItem('brahmastra_secret_codes', JSON.stringify(codes));
+        renderSecretCodes();
+        broadcastUpdate('secret_codes', codes);
+        showToast('Code deleted!', 'success');
+    }
+
+    // TICKET CHAT LOGIC
+    function openAdminTicketChat(ticketId) {
+        currentTicketId = ticketId;
+        db.collection('tickets').doc(ticketId).onSnapshot(doc => {
+            if (!doc.exists) return;
+            const t = doc.data();
+            document.getElementById('admin-chat-user').textContent = t.userName;
+            document.getElementById('admin-chat-email').textContent = t.userEmail;
+            document.getElementById('admin-chat-ticket-id').textContent = t.id;
+            document.getElementById('admin-chat-category').textContent = t.category.toUpperCase();
+            document.getElementById('admin-chat-subject').textContent = t.subject;
+            document.getElementById('admin-chat-description').textContent = t.description;
+            document.getElementById('admin-ticket-status').value = t.status;
+            const img = document.getElementById('admin-chat-screenshot');
+            if (t.screenshot) { img.src = t.screenshot; img.classList.remove('hidden'); } else { img.classList.add('hidden'); }
+            
+            const container = document.getElementById('admin-chat-messages');
+            container.innerHTML = '';
+            (t.messages || []).forEach(msg => {
+                const isAdmin = msg.sender === 'admin';
+                container.innerHTML += `
+                    <div class="flex ${isAdmin ? 'justify-end' : 'justify-start'}">
+                        <div class="max-w-[80%] ${isAdmin ? 'bg-purple-600/30 border-purple-400/50 rounded-br-none' : 'bg-white/10 border-white/20 rounded-bl-none'} border p-3 rounded-xl">
+                            <p class="text-[10px] ${isAdmin ? 'text-purple-200' : 'text-gray-400'} font-bold mb-1 uppercase">${msg.senderName || (isAdmin ? 'Admin' : 'You')}</p>
+                            <p class="text-white text-xs">${msg.message}</p>
+                        </div>
+                    </div>
+                `;
+            });
+            container.scrollTop = container.scrollHeight;
+        });
+        openModal('admin-ticket-modal');
+    }
+
+    function adminSendReply() {
+        const input = document.getElementById('admin-reply-input');
+        const message = input.value.trim();
+        if (!message || !currentTicketId) return;
+        
+        const replyData = { sender: 'admin', senderName: 'Naman (Admin)', message: message, timestamp: Date.now() };
+        db.collection('tickets').doc(currentTicketId).update({
+            messages: firebase.firestore.FieldValue.arrayUnion(replyData),
+            status: 'in_progress'
+        }).then(() => {
+            input.value = '';
+            showToast('Reply sent!', 'success');
+        }).catch(e => alert('Error: ' + e.message));
+    }
+
+    function sendQuickReply(message) {
+        document.getElementById('admin-reply-input').value = message;
+        adminSendReply();
+    }
+
+    function updateTicketStatus() {
+        if (!currentTicketId) return;
+        const status = document.getElementById('admin-ticket-status').value;
+        db.collection('tickets').doc(currentTicketId).update({ status: status }).then(() => {
+            showToast('Status updated!', 'success');
+        });
+    }
+
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); document.getElementById(id).classList.remove('flex'); }
+
+    // REALTIME LISTENER
+    function startRealtimeListener() {
+        // Listen for local orders (from app.js)
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'brahmastra_pending_orders' && e.newValue) {
+                loadPendingOrders();
+                updateDashboardStats();
+            }
+        });
+        
+        // Listen for Broadcast Channel
+        syncChannel.onmessage = (e) => {
+            if (e.data.type === 'new_order') loadPendingOrders();
+        });
+    }
+
+    // EXPORT
+    function exportData() {
+        const data = {
+            games: getAllGames(),
+            deals: getAdminData('deals', {}),
+            pending: JSON.parse(localStorage.getItem('brahmastra_pending_orders') || []),
+            state: JSON.parse(localStorage.getItem('brahmastra_state') || '{}'),
+            exportedAt: new Date().toISOString()
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'brahmastra_backup_' + Date.now() + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Data exported!', 'success');
+    }
+
+    // ICONS
+    lucide.createIcons();
+    </script>
+</body>
+</html>

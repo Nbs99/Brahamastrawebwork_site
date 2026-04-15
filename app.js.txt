@@ -1,0 +1,2105 @@
+/* ============================================
+   BRAHMASTRA GAME STORE - COMPLETE APP.JS
+   Full Functionality Engine
+   ============================================ */
+
+// ============ FIREBASE CONFIG ============
+const firebaseConfig = {
+    apiKey: "AIzaSyDemoKeyReplaceWithYours",
+    authDomain: "brahmastra-store.firebaseapp.com",
+    projectId: "brahmastra-store",
+    storageBucket: "brahmastra-store.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef"
+};
+
+let db = null;
+let auth = null;
+try {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.firestore();
+} catch(e) {
+    console.warn('Firebase not initialized:', e);
+}
+
+// ============ STATE MANAGEMENT ============
+const State = {
+    user: null,
+    wallet: 0,
+    cart: [],
+    wishlist: [],
+    orders: [],
+    recentlyViewed: [],
+    loyaltyPoints: 0,
+    referrals: 0,
+    referralEarned: 0,
+    searchQuery: '',
+    sortMode: 'default',
+    platformFilter: 'All',
+    visibleItems: 12,
+    perfMode: false,
+    spinUsedToday: false,
+    welcomeClaimed: false,
+    sharedAccessGame: null
+};
+
+// Load state from localStorage
+function loadState() {
+    try {
+        const saved = JSON.parse(localStorage.getItem('brahmastra_state') || '{}');
+        Object.assign(State, saved);
+    } catch(e) {}
+}
+
+function saveState() {
+    try {
+        localStorage.setItem('brahmastra_state', JSON.stringify({
+            wallet: State.wallet,
+            cart: State.cart,
+            wishlist: State.wishlist,
+            orders: State.orders,
+            recentlyViewed: State.recentlyViewed,
+            loyaltyPoints: State.loyaltyPoints,
+            referrals: State.referrals,
+            referralEarned: State.referralEarned,
+            spinUsedToday: State.spinUsedToday,
+            welcomeClaimed: State.welcomeClaimed
+        }));
+    } catch(e) {}
+}
+
+// ============ GAME DATA ============
+const GAMES = [
+    {
+        id: 1, name: "Black Myth: Wukong", price: 2499, mrp: 3999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/2358720/library_600x900.jpg",
+        genre: ["Action", "RPG"], platform: "Steam", rating: 4.8,
+        desc: "An action RPG based on Chinese mythology. Embark on a journey as the Destined One.",
+        specs: { cpu: "Intel i5-8400", gpu: "NVIDIA GTX 1060", ram: "16GB", storage: "130GB" },
+        tags: ["AAA", "Souls-like", "Open World"], shared: true, sharedSlots: 3, sharedPrice: 999
+    },
+    {
+        id: 2, name: "Cyberpunk 2077", price: 999, mrp: 2999,
+        img: "https://images.igdb.com/igdb/image/upload/t_cover_big/co83i0.jpg",
+        genre: ["Action", "RPG"], platform: "Steam", rating: 4.5,
+        desc: "An open-world RPG set in Night City. Become a cyberpunk mercenary.",
+        specs: { cpu: "Intel i7-6700", gpu: "NVIDIA GTX 1060", ram: "16GB", storage: "70GB" },
+        tags: ["AAA", "Open World", "FPS"], shared: true, sharedSlots: 5, sharedPrice: 499
+    },
+    {
+        id: 3, name: "Silent Hill 2 Remake", price: 2499, mrp: 3999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/2124490/library_600x900.jpg",
+        genre: ["Horror"], platform: "Steam", rating: 4.7,
+        desc: "A psychological horror masterpiece reimagined. Face your nightmares.",
+        specs: { cpu: "Intel i5-8400", gpu: "NVIDIA RTX 2070", ram: "16GB", storage: "50GB" },
+        tags: ["AAA", "Survival Horror", "Psychological"], shared: false
+    },
+    {
+        id: 4, name: "Helldivers 2", price: 1999, mrp: 2999,
+        img: "https://images.igdb.com/igdb/image/upload/t_cover_big/co8unr.jpg",
+        genre: ["Action", "Multiplayer"], platform: "Steam", rating: 4.6,
+        desc: "Fight for Super Earth in this intense co-op third-person shooter.",
+        specs: { cpu: "Intel i7-9700K", gpu: "NVIDIA RTX 2060", ram: "16GB", storage: "75GB" },
+        tags: ["AAA", "Co-Op", "Shooter"], shared: true, sharedSlots: 4, sharedPrice: 799
+    },
+    {
+        id: 5, name: "Elden Ring", price: 1999, mrp: 3499,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/1245620/library_600x900.jpg",
+        genre: ["RPG", "Action"], platform: "Steam", rating: 4.9,
+        desc: "A vast world full of excitement. An epic adventure awaits.",
+        specs: { cpu: "Intel i5-8400", gpu: "NVIDIA GTX 1060", ram: "12GB", storage: "60GB" },
+        tags: ["AAA", "Open World", "Souls-like"], shared: true, sharedSlots: 6, sharedPrice: 899
+    },
+    {
+        id: 6, name: "GTA V Premium", price: 499, mrp: 1999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/271590/library_600x900.jpg",
+        genre: ["Action", "Open World"], platform: "Steam", rating: 4.4,
+        desc: "The definitive edition of GTA V with all upgrades. Experience Los Santos.",
+        specs: { cpu: "Intel i5-3470", gpu: "NVIDIA GTX 660", ram: "8GB", storage: "72GB" },
+        tags: ["AAA", "Open World", "Action"], shared: true, sharedSlots: 8, sharedPrice: 299
+    },
+    {
+        id: 7, name: "God of War Ragnarök", price: 2499, mrp: 3999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/1947160/library_600x900.jpg",
+        genre: ["Action", "RPG"], platform: "Steam", rating: 4.8,
+        desc: "Embark on a mythic journey for answers and allies alongside Atreus.",
+        specs: { cpu: "Intel i5-6600K", gpu: "NVIDIA GTX 1060", ram: "8GB", storage: "70GB" },
+        tags: ["AAA", "Action-Adventure", "Norse"], shared: false
+    },
+    {
+        id: 8, name: "Alan Wake 2", price: 1999, mrp: 3499,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/1671960/library_600x900.jpg",
+        genre: ["Horror", "Action"], platform: "Epic", rating: 4.6,
+        desc: "A survival horror game that blurs the line between fiction and reality.",
+        specs: { cpu: "Intel i5-11600K", gpu: "NVIDIA RTX 2060", ram: "16GB", storage: "90GB" },
+        tags: ["AAA", "Survival Horror", "Psychological"], shared: false
+    },
+    {
+        id: 9, name: "Spider-Man Remastered", price: 1799, mrp: 3999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/1811260/library_600x900.jpg",
+        genre: ["Action", "Open World"], platform: "Steam", rating: 4.7,
+        desc: "Be Greater. Be Yourself. Experience the complete award-winning adventure.",
+        specs: { cpu: "Intel i3-4160", gpu: "NVIDIA GTX 950", ram: "8GB", storage: "75GB" },
+        tags: ["AAA", "Open World", "Superhero"], shared: true, sharedSlots: 4, sharedPrice: 899
+    },
+    {
+        id: 10, name: "EA FC 25", price: 1499, mrp: 4999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/268530/library_600x900.jpg",
+        genre: ["Sports", "Multiplayer"], platform: "Steam", rating: 3.8,
+        desc: "Experience the world's game with HyperMotion V and PlayStyles.",
+        specs: { cpu: "Intel i5-6600", gpu: "NVIDIA GTX 1050 Ti", ram: "8GB", storage: "100GB" },
+        tags: ["Sports", "Football", "Multiplayer"], shared: false
+    },
+    {
+        id: 11, name: "Resident Evil 4 Remake", price: 1499, mrp: 2999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/2050650/library_600x900.jpg",
+        genre: ["Horror", "Action"], platform: "Steam", rating: 4.8,
+        desc: "Survival is just the beginning. A reimagining of the classic horror game.",
+        specs: { cpu: "Intel i5-7500", gpu: "NVIDIA GTX 1050 Ti", ram: "8GB", storage: "60GB" },
+        tags: ["AAA", "Survival Horror", "TPS"], shared: true, sharedSlots: 3, sharedPrice: 699
+    },
+    {
+        id: 12, name: "Hogwarts Legacy", price: 1499, mrp: 3499,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/990080/library_600x900.jpg",
+        genre: ["RPG", "Open World"], platform: "Steam", rating: 4.5,
+        desc: "Live the Unwritten. Your legacy is what you make of it at Hogwarts.",
+        specs: { cpu: "Intel i5-6600", gpu: "NVIDIA GTX 960", ram: "16GB", storage: "85GB" },
+        tags: ["AAA", "Open World", "Wizard"], shared: true, sharedSlots: 5, sharedPrice: 749
+    },
+    {
+        id: 13, name: "The Last of Us Part I", price: 1999, mrp: 3999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/1888930/library_600x900.jpg",
+        genre: ["Action", "Horror"], platform: "Steam", rating: 4.7,
+        desc: "Experience the emotional storytelling and unforgettable characters.",
+        specs: { cpu: "Intel i7-8700", gpu: "NVIDIA GTX 1060", ram: "16GB", storage: "100GB" },
+        tags: ["AAA", "Story-Rich", "Survival"], shared: false
+    },
+    {
+        id: 14, name: "Forza Horizon 5", price: 1799, mrp: 3999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/1551360/library_600x900.jpg",
+        genre: ["Racing", "Open World"], platform: "Xbox", rating: 4.6,
+        desc: "Your Ultimate Horizon Adventure awaits! Explore the vibrant open world.",
+        specs: { cpu: "Intel i5-8400", gpu: "NVIDIA GTX 970", ram: "16GB", storage: "103GB" },
+        tags: ["AAA", "Racing", "Open World"], shared: true, sharedSlots: 4, sharedPrice: 899
+    },
+    {
+        id: 15, name: "Starfield", price: 1999, mrp: 3999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/1716740/library_600x900.jpg",
+        genre: ["RPG", "Open World"], platform: "Steam", rating: 4.0,
+        desc: "Explore the galaxy in Bethesda's newest space RPG adventure.",
+        specs: { cpu: "Intel i5-10600K", gpu: "NVIDIA RTX 2070", ram: "16GB", storage: "125GB" },
+        tags: ["AAA", "Space", "Open World"], shared: false
+    },
+    {
+        id: 16, name: "Devil May Cry 5", price: 599, mrp: 1999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/601150/library_600x900.jpg",
+        genre: ["Action"], platform: "Steam", rating: 4.7,
+        desc: "The ultimate Devil Hunter is back with style and action.",
+        specs: { cpu: "Intel i5-4460", gpu: "NVIDIA GTX 760", ram: "8GB", storage: "35GB" },
+        tags: ["AAA", "Hack & Slash", "Stylish"], shared: true, sharedSlots: 6, sharedPrice: 299
+    },
+    {
+        id: 17, name: "Red Dead Redemption 2", price: 1499, mrp: 3499,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/1174180/library_600x900.jpg",
+        genre: ["Action", "Open World"], platform: "Steam", rating: 4.9,
+        desc: "America, 1899. Arthur Morgan and the Van der Linde gang.",
+        specs: { cpu: "Intel i5-2500K", gpu: "NVIDIA GTX 770", ram: "12GB", storage: "150GB" },
+        tags: ["AAA", "Open World", "Western"], shared: true, sharedSlots: 3, sharedPrice: 749
+    },
+    {
+        id: 18, name: "It Takes Two", price: 799, mrp: 1999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/1426210/library_600x900.jpg",
+        genre: ["Multiplayer", "Adventure"], platform: "Steam", rating: 4.8,
+        desc: "Embark on the craziest journey of your life in this co-op adventure.",
+        specs: { cpu: "Intel i3-2100", gpu: "NVIDIA GTX 660", ram: "8GB", storage: "45GB" },
+        tags: ["Co-Op", "Adventure", "Platformer"], shared: false
+    },
+    {
+        id: 19, name: "Ghost of Tsushima", price: 1999, mrp: 3999,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/2015630/library_600x900.jpg",
+        genre: ["Action", "Open World"], platform: "PS5", rating: 4.8,
+        desc: "Become the legendary Ghost warrior and fight back against the Mongol invasion.",
+        specs: { cpu: "Intel i5-8400", gpu: "NVIDIA RTX 2060", ram: "16GB", storage: "75GB" },
+        tags: ["AAA", "Open World", "Samurai"], shared: false
+    },
+    {
+        id: 20, name: "Baldur's Gate 3", price: 2499, mrp: 3499,
+        img: "https://cdn.akamai.steamstatic.com/steam/apps/1086940/library_600x900.jpg",
+        genre: ["RPG"], platform: "Steam", rating: 4.9,
+        desc: "Gather your party and return to the Forgotten Realms in this epic RPG.",
+        specs: { cpu: "Intel i5-4690", gpu: "NVIDIA GTX 970", ram: "8GB", storage: "150GB" },
+        tags: ["AAA", "CRPG", "D&D"], shared: true, sharedSlots: 2, sharedPrice: 1299
+    }
+];
+
+// Upcoming Games for Cube
+const UPCOMING = [
+    { name: "GTA VI", img: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=300&h=300&fit=crop" },
+    { name: "Death Stranding 2", img: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=300&h=300&fit=crop" },
+    { name: "Hollow Knight: Silksong", img: "https://images.unsplash.com/photo-1551103782-8ab07afd45c1?w=300&h=300&fit=crop" },
+    { name: "Fable", img: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=300&h=300&fit=crop" },
+    { name: "Elden Ring DLC 2", img: "https://images.unsplash.com/photo-1535223289827-42f1e9919769?w=300&h=300&fit=crop" },
+    { name: "Marvel's Blade", img: "https://images.unsplash.com/photo-1608889825103-eb5ed706fc64?w=300&h=300&fit=crop" }
+];
+
+// Reviews for Slider
+const REVIEWS = [
+    { name: "Rahul K.", text: "Brahmastra gave me instant access to Wukong. No scams, no tension. Best store!", rating: 5, avatar: "🎮" },
+    { name: "Priya S.", text: "Was skeptical at first but Naman delivered within 30 seconds on WhatsApp. Legit!", rating: 5, avatar: "👑" },
+    { name: "Arjun M.", text: "Bought Cyberpunk + DLC. Saved ₹2000 compared to Steam. Absolute steal!", rating: 5, avatar: "🔥" },
+    { name: "Sneha R.", text: "The Brahmix software boosted my FPS from 40 to 90. Magic!", rating: 5, avatar: "⚡" },
+    { name: "Vikram T.", text: "Elite Pass worth every rupee. Priority delivery is no joke!", rating: 5, avatar: "💎" },
+    { name: "Ankit P.", text: "Shared access for Elden Ring at ₹899? Insane value. Works perfectly.", rating: 5, avatar: "🌟" },
+    { name: "Divya J.", text: "Customer support is 24/7. They actually respond unlike other stores.", rating: 5, avatar: "🎯" },
+    { name: "Rohan D.", text: "Referral program earned me ₹500 in just one week. Love this store!", rating: 5, avatar: "💰" },
+    { name: "Megha N.", text: "Daily spin win gave me ₹100 today. Free money for gaming!", rating: 5, avatar: "🎰" },
+    { name: "Saurabh G.", text: "From Indiamart to here — best decision ever. 100% genuine.", rating: 5, avatar: "🏆" }
+];
+
+// AI Bot Responses
+const AI_RESPONSES = {
+    requirements: (game) => `📋 ${game} Requirements:\n\nCPU: Intel i5-8400 or better\nGPU: NVIDIA GTX 1060 or better\nRAM: 16GB\nStorage: 50-150GB\n\n💡 Tip: Use Brahmix Pro to auto-optimize your settings!`,
+    
+    track: () => `📦 To track your order:\n\n1. Open Dashboard → Order History\n2. Click on any order to see live status\n\nOr WhatsApp us your Order ID at +91 9313339081 for instant updates!`,
+    
+    refund: () => `🔄 Refund Policy:\n\n• Digital keys: No refund once delivered\n• Wrong key: Instant replacement\n• Wallet: Refund within 24hrs\n\nContact support for any issues!`,
+    
+    payment: () => `💳 Payment Methods:\n\n• UPI (GPay, PhonePe, Paytm)\n• Net Banking\n• Wallet Cash\n• Debit/Credit Card\n\nAll payments are 100% secure!`,
+    
+    shared: () => `🔗 Shared Access:\n\n• Multiple users contribute to one account\n• Each gets scheduled play time\n• 70% cheaper than full price\n• Zero logout issues guaranteed!`,
+    
+    default: () => `🤔 I'm not sure about that. Here's what I can help with:\n\n• "requirements [game name]"\n• "track my order"\n• "refund policy"\n• "payment methods"\n• "shared access"\n• "contact support"\n\nTry asking one of these!`
+};
+
+// Policy Content
+const POLICIES = {
+    "About Us": `<h2 class="text-2xl font-display font-bold text-white mb-4">About Brahmastra</h2>
+        <p class="mb-4">Brahmastra is India's premium digital game store founded by Naman. We provide instant, legitimate game access at unbeatable prices.</p>
+        <p class="mb-4">We stand against fraudulent offline activation schemes and prioritize your absolute gaming freedom. Every game we deliver is 100% genuine.</p>
+        <p>Our mission: Make premium gaming accessible to every Indian gamer without compromising on authenticity or security.</p>`,
+    
+    "Terms of Service": `<h2 class="text-2xl font-display font-bold text-white mb-4">Terms of Service</h2>
+        <p class="mb-4">By using Brahmastra, you agree to:</p>
+        <ul class="list-disc pl-6 space-y-2">
+            <li>Provide accurate information during registration</li>
+            <li>Not resell or redistribute game access</li>
+            <li>Not attempt to exploit vulnerabilities</li>
+            <li>Make legitimate payments only</li>
+            <li>Respect community guidelines in chat</li>
+        </ul>
+        <p class="mt-4">Violation may result in account suspension.</p>`,
+    
+    "Privacy Policy": `<h2 class="text-2xl font-display font-bold text-white mb-4">Privacy Policy</h2>
+        <p class="mb-4">We collect minimal data:</p>
+        <ul class="list-disc pl-6 space-y-2">
+            <li>Email for order delivery</li>
+            <li>Username for profile</li>
+            <li>Order history for your convenience</li>
+        </ul>
+        <p class="mt-4">We NEVER share your data with third parties. All data is encrypted and stored securely via Firebase.</p>`,
+    
+    "Track Order": `<h2 class="text-2xl font-display font-bold text-white mb-4">Track Your Order</h2>
+        <p class="mb-4">To track your order:</p>
+        <ol class="list-decimal pl-6 space-y-2">
+            <li>Login to your Brahmastra account</li>
+            <li>Go to Dashboard → Order History</li>
+            <li>Click on any order for live status</li>
+        </ol>
+        <p class="mt-4">Or WhatsApp your Order ID to <strong>+91 9313339081</strong> for instant tracking!</p>`,
+    
+    "Contact Us": `<h2 class="text-2xl font-display font-bold text-white mb-4">Contact Us</h2>
+        <div class="space-y-4">
+            <div class="bg-white/5 p-4 rounded-xl"><strong>WhatsApp:</strong> +91 9313339081 (24/7)</div>
+            <div class="bg-white/5 p-4 rounded-xl"><strong>Email:</strong> support@brahmastra.store</div>
+            <div class="bg-white/5 p-4 rounded-xl"><strong>IndiaMart:</strong> Search "Brahmastra Games"</div>
+            <div class="bg-white/5 p-4 rounded-xl"><strong>Response Time:</strong> Under 5 minutes!</div>
+        </div>`,
+    
+    "Refund Policy": `<h2 class="text-2xl font-display font-bold text-white mb-4">Refund Policy</h2>
+        <ul class="list-disc pl-6 space-y-2">
+            <li><strong>Digital Keys:</strong> No refund once delivered and verified</li>
+            <li><strong>Wrong Key:</strong> Instant replacement guaranteed</li>
+            <li><strong>Wallet Balance:</strong> Refundable within 24 hours of add</li>
+            <li><strong>Pre-orders:</strong> Full refund if cancelled 48hrs before launch</li>
+        </ul>
+        <p class="mt-4">Contact WhatsApp support for all refund requests.</p>`,
+    
+    "Terms & Conditions": `<h2 class="text-2xl font-display font-bold text-white mb-4">Terms & Conditions</h2>
+        <p class="mb-4">These terms govern your use of Brahmastra Game Store services.</p>
+        <ul class="list-disc pl-6 space-y-2">
+            <li>All sales are final for digital products</li>
+            <li>Users must be 13+ years old</li>
+            <li>Game access is non-transferable</li>
+            <li>We reserve right to refuse service</li>
+            <li>Prices subject to change without notice</li>
+        </ul>`,
+    
+    "Cookie Policy": `<h2 class="text-2xl font-display font-bold text-white mb-4">Cookie Policy</h2>
+        <p class="mb-4">We use essential cookies only:</p>
+        <ul class="list-disc pl-6 space-y-2">
+            <li><strong>Auth Cookie:</strong> Keeps you logged in</li>
+            <li><strong>State Cookie:</strong> Saves cart, wishlist, preferences</li>
+            <li><strong>Analytics:</strong> Anonymous usage stats only</li>
+        </ul>
+        <p class="mt-4">No third-party tracking cookies are used.</p>`,
+    
+    "Privacy Notice": `<h2 class="text-2xl font-display font-bold text-white mb-4">Privacy Notice</h2>
+        <p>Your privacy matters. We only collect what's necessary to provide our services. No data selling, no profiling, no ads tracking. Period.</p>`,
+    
+    "Modern Slavery Statement": `<h2 class="text-2xl font-display font-bold text-white mb-4">Modern Slavery Statement</h2>
+        <p>Brahmastra is committed to ethical business practices. We have zero tolerance for modern slavery, forced labor, or human trafficking in our operations or supply chain.</p>`
+};
+
+// ============ UTILITY FUNCTIONS ============
+function formatPrice(n) {
+    return '₹' + n.toLocaleString('en-IN');
+}
+
+function generateOrderId() {
+    return 'BX' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substr(2, 4).toUpperCase();
+}
+
+function showCustomAlert(title, message, icon = 'info') {
+    const modal = document.getElementById('custom-alert-modal');
+    const iconContainer = document.getElementById('custom-alert-icon');
+    document.getElementById('custom-alert-title').textContent = title;
+    document.getElementById('custom-alert-message').textContent = message;
+    
+    const icons = {
+        info: '<i data-lucide="info" class="w-12 h-12 text-brahma-cyan"></i>',
+        success: '<i data-lucide="check-circle" class="w-12 h-12 text-green-500"></i>',
+        error: '<i data-lucide="alert-circle" class="w-12 h-12 text-red-500"></i>',
+        warning: '<i data-lucide="alert-triangle" class="w-12 h-12 text-yellow-500"></i>'
+    };
+    
+    iconContainer.innerHTML = icons[icon] || icons.info;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    lucide.createIcons();
+}
+
+function closeCustomAlert() {
+    const modal = document.getElementById('custom-alert-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+function openModal(id) {
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+}
+
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+function showAchievement(title, desc, icon = '🏆') {
+    const container = document.getElementById('achievement-container');
+    const el = document.createElement('div');
+    el.className = 'pointer-events-auto bg-black/90 border border-yellow-500/50 rounded-xl p-4 min-w-[280px] shadow-[0_0_30px_rgba(234,179,8,0.3)] animate-slide-down';
+    el.innerHTML = `
+        <div class="flex items-center gap-3">
+            <span class="text-2xl">${icon}</span>
+            <div>
+                <p class="text-[10px] text-yellow-500 font-bold uppercase tracking-widest">Achievement Unlocked!</p>
+                <p class="text-white font-bold text-sm">${title}</p>
+                <p class="text-gray-400 text-xs">${desc}</p>
+            </div>
+        </div>
+    `;
+    container.appendChild(el);
+    
+    setTimeout(() => {
+        el.style.transition = 'opacity 0.5s, transform 0.5s';
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(100px)';
+        setTimeout(() => el.remove(), 500);
+    }, 4000);
+}
+
+// ============ AUTH FUNCTIONS ============
+function switchAuthTab(tab) {
+    const loginTab = document.getElementById('auth-tab-login');
+    const signupTab = document.getElementById('auth-tab-signup');
+    const loginForm = document.getElementById('login-form');
+    const signupForm = document.getElementById('signup-form');
+    
+    if (tab === 'login') {
+        loginTab.className = 'flex-1 pb-3 text-sm font-bold uppercase text-brahma-cyan border-b-2 border-brahma-cyan';
+        signupTab.className = 'flex-1 pb-3 text-sm font-bold uppercase text-gray-500';
+        loginForm.classList.remove('hidden');
+        signupForm.classList.add('hidden');
+    } else {
+        signupTab.className = 'flex-1 pb-3 text-sm font-bold uppercase text-brahma-cyan border-b-2 border-brahma-cyan';
+        loginTab.className = 'flex-1 pb-3 text-sm font-bold uppercase text-gray-500';
+        signupForm.classList.remove('hidden');
+        loginForm.classList.add('hidden');
+    }
+}
+
+async function handleAuth(e, mode) {
+    e.preventDefault();
+    
+    if (mode === 'login') {
+        const email = document.getElementById('login-email').value;
+        const pass = document.getElementById('login-pass').value;
+        
+        try {
+            if (auth) {
+                const cred = await auth.signInWithEmailAndPassword(email, pass);
+                State.user = { email: cred.user.email, uid: cred.user.uid };
+            } else {
+                State.user = { email, uid: 'local_' + Date.now() };
+            }
+            saveState();
+            closeModal('auth-modal');
+            updateUI();
+            showCustomAlert('Welcome Back!', `Logged in as ${email}`, 'success');
+            showAchievement('Welcome Back', 'You returned to Brahmastra!', '👋');
+        } catch(err) {
+            if (!auth) {
+                State.user = { email, uid: 'local_' + Date.now() };
+                saveState();
+                closeModal('auth-modal');
+                updateUI();
+                showCustomAlert('Login Successful', `Welcome ${email}!`, 'success');
+            } else {
+                showCustomAlert('Login Failed', err.message, 'error');
+            }
+        }
+    } else {
+        const username = document.getElementById('signup-user').value;
+        const email = document.getElementById('signup-email').value;
+        const pass = document.getElementById('signup-pass').value;
+        
+        try {
+            if (auth) {
+                const cred = await auth.createUserWithEmailAndPassword(email, pass);
+                State.user = { email, uid: cred.user.uid, username };
+                if (db) await db.collection('users').doc(cred.user.uid).set({ email, username, wallet: 0, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            } else {
+                State.user = { email, uid: 'local_' + Date.now(), username };
+            }
+            State.wallet = 50;
+            State.loyaltyPoints = 100;
+            saveState();
+            closeModal('auth-modal');
+            updateUI();
+            showCustomAlert('Account Created!', '₹50 added to your wallet!', 'success');
+            showAchievement('New Warrior', 'Joined Brahmastra! +₹50', '⚔️');
+            
+            setTimeout(() => openModal('welcome-bonus-modal'), 1000);
+        } catch(err) {
+            if (!auth) {
+                State.user = { email, uid: 'local_' + Date.now(), username };
+                State.wallet = 50;
+                State.loyaltyPoints = 100;
+                saveState();
+                closeModal('auth-modal');
+                updateUI();
+                showCustomAlert('Account Created!', '₹50 added to your wallet!', 'success');
+                setTimeout(() => openModal('welcome-bonus-modal'), 1000);
+            } else {
+                showCustomAlert('Signup Failed', err.message, 'error');
+            }
+        }
+    }
+}
+
+function userLogout() {
+    if (auth) auth.signOut();
+    State.user = null;
+    State.wallet = 0;
+    saveState();
+    closeModal('dashboard-modal');
+    updateUI();
+    showCustomAlert('Logged Out', 'See you soon, gamer!', 'info');
+}
+
+// ============ UI UPDATE ============
+function updateUI() {
+    // Wallet
+    document.getElementById('wallet-balance-display').textContent = formatPrice(State.wallet);
+    document.getElementById('dash-wallet').textContent = State.wallet;
+    
+    // User info
+    if (State.user) {
+        const name = State.user.username || State.user.email.split('@')[0];
+        document.getElementById('dash-username').textContent = name;
+        document.getElementById('profile-email-display').textContent = State.user.email;
+        document.getElementById('logout-btn').classList.remove('hidden');
+        document.getElementById('dash-role').textContent = 'VERIFIED GAMER';
+        document.getElementById('loyalty-points').textContent = State.loyaltyPoints;
+    } else {
+        document.getElementById('dash-username').textContent = 'Guest';
+        document.getElementById('profile-email-display').textContent = 'Not Logged In';
+        document.getElementById('logout-btn').classList.add('hidden');
+        document.getElementById('dash-role').textContent = 'USER';
+        document.getElementById('loyalty-points').textContent = '0';
+    }
+    
+    // Cart badge
+    const cartBadge = document.getElementById('cart-badge');
+    if (State.cart.length > 0) {
+        cartBadge.classList.remove('hidden');
+        cartBadge.textContent = State.cart.length;
+    } else {
+        cartBadge.classList.add('hidden');
+    }
+    
+    // Wishlist badge
+    const wishBadge = document.getElementById('wishlist-badge');
+    if (State.wishlist.length > 0) {
+        wishBadge.classList.remove('hidden');
+        wishBadge.textContent = State.wishlist.length;
+    } else {
+        wishBadge.classList.add('hidden');
+    }
+    
+    // Recently viewed count
+    document.getElementById('recently-viewed-count').textContent = State.recentlyViewed.length;
+}
+
+// ============ CART FUNCTIONS ============
+function addToCart(gameId) {
+    const game = GAMES.find(g => g.id === gameId);
+    if (!game) return;
+    
+    if (State.cart.includes(gameId)) {
+        showCustomAlert('Already in Cart', `${game.name} is already in your cart!`, 'warning');
+        return;
+    }
+    
+    State.cart.push(gameId);
+    saveState();
+    updateUI();
+    showCustomAlert('Added to Cart', `${game.name} - ${formatPrice(game.price)}`, 'success');
+    showAchievement('Cart Updated', `${game.name} added!`, '🛒');
+}
+
+function removeFromCart(gameId) {
+    State.cart = State.cart.filter(id => id !== gameId);
+    saveState();
+    updateUI();
+    renderCart();
+}
+
+function openCart() {
+    renderCart();
+    openModal('game-modal');
+}
+
+function renderCart() {
+    const container = document.getElementById('game-modal-content');
+    const cartGames = State.cart.map(id => GAMES.find(g => g.id === id)).filter(Boolean);
+    const total = cartGames.reduce((sum, g) => sum + g.price, 0);
+    
+    container.innerHTML = `
+        <div class="w-full h-full flex flex-col p-8 overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-display font-black text-white uppercase tracking-widest">Your Cart</h2>
+                <button onclick="closeModal('game-modal')" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            
+            ${cartGames.length === 0 ? `
+                <div class="flex-1 flex flex-col items-center justify-center text-center">
+                    <i data-lucide="shopping-bag" class="w-20 h-20 text-gray-600 mb-4"></i>
+                    <p class="text-gray-400 text-lg">Your cart is empty</p>
+                    <p class="text-gray-600 text-sm mt-2">Browse games and add them to cart</p>
+                    <button onclick="closeModal('game-modal')" class="mt-6 px-6 py-3 bg-brahma-cyan text-black font-bold uppercase rounded-xl text-xs">Browse Games</button>
+                </div>
+            ` : `
+                <div class="flex-1 space-y-4 overflow-y-auto">
+                    ${cartGames.map(game => `
+                        <div class="flex gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
+                            <img src="${game.img}" class="w-20 h-28 object-cover rounded-lg">
+                            <div class="flex-1">
+                                <h4 class="text-white font-bold text-sm uppercase">${game.name}</h4>
+                                <p class="text-gray-400 text-xs mt-1">${game.platform} • ${game.genre.join(', ')}</p>
+                                <p class="text-brahma-cyan font-bold mt-2">${formatPrice(game.price)}</p>
+                            </div>
+                            <button onclick="removeFromCart(${game.id})" class="text-red-500 hover:text-red-400 self-start"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="border-t border-white/10 pt-6 mt-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-gray-400">Subtotal</span>
+                        <span class="text-white font-bold">${formatPrice(total)}</span>
+                    </div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-gray-400">Wallet Balance</span>
+                        <span class="text-brahma-cyan font-bold">${formatPrice(State.wallet)}</span>
+                    </div>
+                    <div class="flex justify-between items-center mb-6 text-lg">
+                        <span class="text-white font-bold">Total</span>
+                        <span class="text-brahma-cyan font-display font-black">${formatPrice(total)}</span>
+                    </div>
+                    
+                    ${State.wallet >= total ? `
+                        <button onclick="payWithWallet(${total})" class="w-full py-4 bg-brahma-cyan text-black font-black uppercase rounded-xl text-xs tracking-widest mb-3">Pay with Wallet</button>
+                    ` : `
+                        <button onclick="openUPIPayment(${total})" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black uppercase rounded-xl text-xs tracking-widest mb-3 flex items-center justify-center gap-2">
+                            <i data-lucide="smartphone" class="w-4 h-4"></i> Pay with UPI
+                        </button>
+                    `}
+                    
+                    ${total > State.wallet && State.wallet > 0 ? `
+                        <button onclick="payWithWallet(${State.wallet})" class="w-full py-3 bg-green-600/20 border border-green-500 text-green-400 font-bold uppercase rounded-xl text-xs">Use Wallet (${formatPrice(State.wallet)}) + UPI Remaining</button>
+                    ` : ''}
+                </div>
+            `}
+        </div>
+    `;
+    lucide.createIcons();
+}
+
+function payWithWallet(amount) {
+    if (State.wallet < amount) {
+        showCustomAlert('Insufficient Balance', `You need ${formatPrice(amount - State.wallet)} more in your wallet.`, 'error');
+        return;
+    }
+    
+    State.wallet -= amount;
+    const orderId = generateOrderId();
+    const games = State.cart.map(id => GAMES.find(g => g.id === id)).filter(Boolean);
+    
+    games.forEach(g => {
+        State.orders.unshift({
+            id: orderId,
+            game: g.name,
+            price: g.price,
+            date: new Date().toLocaleDateString(),
+            status: 'Delivered',
+            img: g.img
+        });
+    });
+    
+    State.cart = [];
+    State.loyaltyPoints += Math.floor(amount / 10);
+    saveState();
+    updateUI();
+    closeModal('game-modal');
+    
+    showCustomAlert('Payment Successful!', `Order ${orderId} confirmed!`, 'success');
+    showAchievement('Purchase Complete', `+${Math.floor(amount / 10)} XP earned!`, '💰');
+    triggerAirdrop();
+}
+
+// ============ WISHLIST FUNCTIONS ============
+function toggleWishlist(gameId) {
+    const idx = State.wishlist.indexOf(gameId);
+    if (idx > -1) {
+        State.wishlist.splice(idx, 1);
+        showCustomAlert('Removed', 'Removed from wishlist', 'info');
+    } else {
+        State.wishlist.push(gameId);
+        const game = GAMES.find(g => g.id === gameId);
+        showCustomAlert('Added to Wishlist', game.name, 'success');
+    }
+    saveState();
+    updateUI();
+    renderCatalog();
+}
+
+function openWishlist() {
+    renderWishlist();
+    switchDashTab('wishlist');
+    openDashboard();
+}
+
+function renderWishlist() {
+    const container = document.getElementById('wishlist-items');
+    const games = State.wishlist.map(id => GAMES.find(g => g.id === id)).filter(Boolean);
+    
+    if (games.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-8">Your wishlist is empty</p>';
+        return;
+    }
+    
+    container.innerHTML = games.map(game => `
+        <div class="flex gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
+            <img src="${game.img}" class="w-16 h-24 object-cover rounded-lg cursor-pointer" onclick="closeModal('dashboard-modal'); openGameModal(${game.id});">
+            <div class="flex-1">
+                <h4 class="text-white font-bold text-sm uppercase">${game.name}</h4>
+                <p class="text-brahma-cyan font-bold text-sm mt-1">${formatPrice(game.price)}</p>
+                <button onclick="addToCart(${game.id}); toggleWishlist(${game.id});" class="mt-2 px-4 py-1 bg-brahma-cyan text-black font-bold uppercase rounded-lg text-[10px]">Add to Cart</button>
+            </div>
+            <button onclick="toggleWishlist(${game.id}); renderWishlist();" class="text-red-500 hover:text-red-400 self-start"><i data-lucide="heart" class="w-5 h-5 fill-current"></i></button>
+        </div>
+    `).join('');
+    lucide.createIcons();
+}
+
+// ============ CATALOG FUNCTIONS ============
+function getFilteredGames() {
+    let games = [...GAMES];
+    
+    // Search
+    if (State.searchQuery) {
+        const q = State.searchQuery.toLowerCase();
+        games = games.filter(g => 
+            g.name.toLowerCase().includes(q) || 
+            g.genre.some(genre => genre.toLowerCase().includes(q)) ||
+            g.platform.toLowerCase().includes(q) ||
+            g.tags.some(tag => tag.toLowerCase().includes(q))
+        );
+    }
+    
+    // Platform filter
+    if (State.platformFilter !== 'All') {
+        games = games.filter(g => g.platform === State.platformFilter);
+    }
+    
+    // Sort
+    switch (State.sortMode) {
+        case 'price-asc': games.sort((a, b) => a.price - b.price); break;
+        case 'price-desc': games.sort((a, b) => b.price - a.price); break;
+        case 'rating-desc': games.sort((a, b) => b.rating - a.rating); break;
+    }
+    
+    return games;
+}
+
+function renderCatalog() {
+    const grid = document.getElementById('games-grid');
+    const games = getFilteredGames();
+    const visible = games.slice(0, State.visibleItems);
+    
+    grid.innerHTML = visible.map(game => {
+        const discount = Math.round((1 - game.price / game.mrp) * 100);
+        const isWished = State.wishlist.includes(game.id);
+        const inCart = State.cart.includes(game.id);
+        
+        return `
+            <div class="group cursor-pointer" onclick="openGameModal(${game.id})">
+                <div class="relative rounded-2xl overflow-hidden border border-white/10 hover:border-brahma-cyan/50 transition-all duration-300 bg-black/40">
+                    <div class="relative aspect-[3/4] overflow-hidden">
+                        <img src="${game.img}" class="w-full h-full object-cover opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500" loading="lazy">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+                        
+                        ${discount > 0 ? `<div class="absolute top-2 left-2 bg-green-500 text-black text-[10px] font-black px-2 py-0.5 rounded">-${discount}%</div>` : ''}
+                        
+                        <button onclick="event.stopPropagation(); toggleWishlist(${game.id})" class="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center hover:scale-110 transition-transform">
+                            <i data-lucide="heart" class="w-4 h-4 ${isWished ? 'text-red-500 fill-current' : 'text-white'}"></i>
+                        </button>
+                        
+                        ${game.shared ? `<div class="absolute bottom-2 left-2 bg-purple-500/80 text-white text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> SHARED</div>` : ''}
+                    </div>
+                    
+                    <div class="p-3">
+                        <h4 class="text-white font-bold text-xs uppercase truncate">${game.name}</h4>
+                        <div class="flex items-center gap-1 mt-1">
+                            <i data-lucide="star" class="w-3 h-3 text-yellow-400 fill-current"></i>
+                            <span class="text-yellow-400 text-[10px] font-bold">${game.rating}</span>
+                            <span class="text-gray-500 text-[10px]">• ${game.platform}</span>
+                        </div>
+                        <div class="flex items-center justify-between mt-2">
+                            <div>
+                                <span class="text-brahma-cyan font-bold text-sm">${formatPrice(game.price)}</span>
+                                ${game.mrp > game.price ? `<span class="text-gray-600 text-[10px] line-through ml-1">${formatPrice(game.mrp)}</span>` : ''}
+                            </div>
+                            <button onclick="event.stopPropagation(); ${inCart ? 'showCustomAlert(\"In Cart\", \"Already added!\", \"warning\")' : `addToCart(${game.id})`}" class="w-8 h-8 rounded-lg ${inCart ? 'bg-brahma-cyan' : 'bg-white/10 hover:bg-brahma-cyan'} flex items-center justify-center transition-colors">
+                                <i data-lucide="${inCart ? 'check' : 'plus'}" class="w-4 h-4 ${inCart ? 'text-black' : 'text-white'}"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // Load more button
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    loadMoreBtn.style.display = games.length > State.visibleItems ? 'block' : 'none';
+    
+    lucide.createIcons();
+}
+
+function handleSearch(query) {
+    State.searchQuery = query;
+    State.visibleItems = 12;
+    renderCatalog();
+}
+
+function handleSort(mode) {
+    State.sortMode = mode;
+    renderCatalog();
+}
+
+// Platform filter buttons
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('filter-btn')) {
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.className = 'filter-btn text-gray-500 hover:text-white pb-1 text-sm font-bold font-tech uppercase';
+        });
+        e.target.className = 'filter-btn text-brahma-cyan border-b border-brahma-cyan pb-1 text-sm font-bold font-tech uppercase';
+        State.platformFilter = e.target.dataset.filter;
+        renderCatalog();
+    }
+});
+
+// ============ GAME MODAL ============
+function openGameModal(gameId) {
+    const game = GAMES.find(g => g.id === gameId);
+    if (!game) return;
+    
+    // Add to recently viewed
+    State.recentlyViewed = [gameId, ...State.recentlyViewed.filter(id => id !== gameId)].slice(0, 10);
+    saveState();
+    updateUI();
+    renderRecentlyViewed();
+    
+    const discount = Math.round((1 - game.price / game.mrp) * 100);
+    const isWished = State.wishlist.includes(game.id);
+    const inCart = State.cart.includes(game.id);
+    
+    const container = document.getElementById('game-modal-content');
+    container.innerHTML = `
+        <div class="w-full md:w-2/5 h-full relative overflow-hidden bg-black">
+            <img src="${game.img}" class="w-full h-full object-cover opacity-80">
+            <div class="absolute inset-0 bg-gradient-to-r from-transparent to-[#0c0c0c] hidden md:block"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-[#0c0c0c] to-transparent md:hidden"></div>
+            <button onclick="closeModal('game-modal')" class="absolute top-4 right-4 z-10 bg-black/50 p-2 rounded-full hover:bg-red-500 transition-colors"><i data-lucide="x" class="w-5 h-5 text-white"></i></button>
+            ${discount > 0 ? `<div class="absolute top-4 left-4 bg-green-500 text-black text-sm font-black px-3 py-1 rounded-lg">-${discount}% OFF</div>` : ''}
+        </div>
+        
+        <div class="w-full md:w-3/5 h-full overflow-y-auto p-8 no-scrollbar">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="bg-brahma-cyan/20 border border-brahma-cyan text-brahma-cyan text-[10px] px-2 py-1 rounded font-bold">${game.platform}</span>
+                ${game.genre.map(g => `<span class="bg-white/10 text-gray-300 text-[10px] px-2 py-1 rounded">${g}</span>`).join('')}
+            </div>
+            
+            <h2 class="text-3xl font-display font-black text-white uppercase tracking-widest mb-2">${game.name}</h2>
+            
+            <div class="flex items-center gap-2 mb-4">
+                <div class="flex items-center gap-1">
+                    ${Array(5).fill(0).map((_, i) => `<i data-lucide="star" class="w-4 h-4 ${i < Math.floor(game.rating) ? 'text-yellow-400 fill-current' : 'text-gray-600'}"></i>`).join('')}
+                </div>
+                <span class="text-yellow-400 font-bold text-sm">${game.rating}</span>
+            </div>
+            
+            <p class="text-gray-400 text-sm leading-relaxed mb-6">${game.desc}</p>
+            
+            <div class="flex items-center gap-4 mb-6">
+                <span class="text-3xl font-display font-black text-brahma-cyan">${formatPrice(game.price)}</span>
+                ${game.mrp > game.price ? `<span class="text-gray-500 line-through text-lg">${formatPrice(game.mrp)}</span>` : ''}
+            </div>
+            
+            <div class="flex gap-3 mb-8">
+                <button onclick="${inCart ? 'showCustomAlert(\"In Cart\", \"Already added!\", \"warning\")' : `addToCart(${game.id}); openGameModal(${game.id});`}" class="flex-1 py-4 ${inCart ? 'bg-green-500' : 'bg-brahma-cyan'} text-black font-black uppercase rounded-xl text-xs tracking-widest flex items-center justify-center gap-2">
+                    <i data-lucide="${inCart ? 'check' : 'shopping-bag'}" class="w-4 h-4"></i> ${inCart ? 'In Cart' : 'Add to Cart'}
+                </button>
+                <button onclick="toggleWishlist(${game.id}); openGameModal(${game.id});" class="w-14 py-4 ${isWished ? 'bg-red-500' : 'bg-white/10'} rounded-xl flex items-center justify-center hover:scale-105 transition-transform">
+                    <i data-lucide="heart" class="w-5 h-5 ${isWished ? 'text-white fill-current' : 'text-white'}"></i>
+                </button>
+            </div>
+            
+            ${game.shared ? `
+                <button onclick="openSharedSlots(${game.id})" class="w-full py-3 bg-purple-600/20 border border-purple-500 text-purple-400 font-bold uppercase rounded-xl text-xs mb-8 flex items-center justify-center gap-2 hover:bg-purple-600 hover:text-white transition-colors">
+                    <i data-lucide="users" class="w-4 h-4"></i> Shared Access - ${formatPrice(game.sharedPrice)} (${game.sharedSlots} slots)
+                </button>
+            ` : ''}
+            
+            <div class="border-t border-white/10 pt-6">
+                <h4 class="text-white font-bold mb-4 uppercase flex items-center gap-2"><i data-lucide="cpu" class="w-4 h-4 text-brahma-cyan"></i> System Requirements</h4>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-white/5 p-3 rounded-lg"><span class="text-[10px] text-gray-500 uppercase">CPU</span><p class="text-white text-xs font-bold mt-1">${game.specs.cpu}</p></div>
+                    <div class="bg-white/5 p-3 rounded-lg"><span class="text-[10px] text-gray-500 uppercase">GPU</span><p class="text-white text-xs font-bold mt-1">${game.specs.gpu}</p></div>
+                    <div class="bg-white/5 p-3 rounded-lg"><span class="text-[10px] text-gray-500 uppercase">RAM</span><p class="text-white text-xs font-bold mt-1">${game.specs.ram}</p></div>
+                    <div class="bg-white/5 p-3 rounded-lg"><span class="text-[10px] text-gray-500 uppercase">Storage</span><p class="text-white text-xs font-bold mt-1">${game.specs.storage}</p></div>
+                </div>
+            </div>
+            
+            <div class="mt-6">
+                <h4 class="text-white font-bold mb-3 uppercase">Tags</h4>
+                <div class="flex flex-wrap gap-2">
+                    ${game.tags.map(tag => `<span class="bg-white/5 text-gray-400 text-[10px] px-3 py-1 rounded-full">${tag}</span>`).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    openModal('game-modal');
+    lucide.createIcons();
+}
+
+// ============ RECENTLY VIEWED ============
+function renderRecentlyViewed() {
+    const section = document.getElementById('recently-viewed-section');
+    const slider = document.getElementById('recently-viewed-slider');
+    const games = State.recentlyViewed.map(id => GAMES.find(g => g.id === id)).filter(Boolean);
+    
+    if (games.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+    
+    section.classList.remove('hidden');
+    slider.innerHTML = games.map(game => `
+        <div class="min-w-[200px] cursor-pointer group" onclick="openGameModal(${game.id})">
+            <div class="relative rounded-xl overflow-hidden border border-white/10 hover:border-brahma-cyan/50 transition-all">
+                <img src="${game.img}" class="w-full h-48 object-cover opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300">
+                <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent"></div>
+                <div class="absolute bottom-2 left-2 right-2">
+                    <p class="text-white font-bold text-xs truncate">${game.name}</p>
+                    <p class="text-brahma-cyan text-[10px] font-bold">${formatPrice(game.price)}</p>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ============ DASHBOARD ============
+function openDashboard() {
+    if (!State.user) {
+        openModal('auth-modal');
+        return;
+    }
+    openModal('dashboard-modal');
+    renderOrderHistory();
+}
+
+function switchDashTab(tab) {
+    document.querySelectorAll('.dash-tab').forEach(t => t.classList.add('hidden'));
+    document.querySelectorAll('.dash-btn').forEach(b => {
+        b.className = 'dash-btn w-full text-left px-6 py-3 rounded-xl text-xs font-bold text-gray-500 hover:bg-white/5 uppercase tracking-widest';
+    });
+    
+    const tabEl = document.getElementById('tab-' + tab);
+    if (tabEl) tabEl.classList.remove('hidden');
+    
+    // Highlight active button
+    const buttons = document.querySelectorAll('.dash-btn');
+    const tabIndex = ['profile', 'orders', 'wishlist', 'rewards', 'referral'].indexOf(tab);
+    if (buttons[tabIndex]) {
+        buttons[tabIndex].className = 'dash-btn w-full text-left px-6 py-3 rounded-xl text-xs font-bold text-white bg-brahma-cyan/10 border-l-4 border-brahma-cyan uppercase tracking-widest';
+    }
+    
+    if (tab === 'orders') renderOrderHistory();
+    if (tab === 'wishlist') renderWishlist();
+    if (tab === 'profile') updateUI();
+}
+
+function renderOrderHistory() {
+    const container = document.getElementById('order-history-list');
+    
+    if (State.orders.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12">
+                <i data-lucide="package" class="w-16 h-16 text-gray-600 mx-auto mb-4"></i>
+                <p class="text-gray-400">No orders yet</p>
+                <p class="text-gray-600 text-sm mt-2">Your order history will appear here</p>
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+    
+    container.innerHTML = State.orders.map(order => `
+        <div class="bg-white/5 p-4 rounded-xl border border-white/10 flex gap-4">
+            <img src="${order.img}" class="w-16 h-20 object-cover rounded-lg">
+            <div class="flex-1">
+                <h4 class="text-white font-bold text-sm uppercase">${order.game}</h4>
+                <p class="text-gray-500 text-xs mt-1">Order: ${order.id}</p>
+                <p class="text-gray-500 text-xs">${order.date}</p>
+            </div>
+            <div class="text-right">
+                <p class="text-brahma-cyan font-bold">${formatPrice(order.price)}</p>
+                <span class="text-green-400 text-[10px] font-bold uppercase flex items-center gap-1 justify-end mt-2"><span class="w-1.5 h-1.5 bg-green-400 rounded-full"></span> ${order.status}</span>
+            </div>
+        </div>
+    `).join('');
+    lucide.createIcons();
+}
+
+// ============ SHARED ACCESS ============
+function openSharedSlots(gameId) {
+    const game = GAMES.find(g => g.id === gameId);
+    if (!game) return;
+    
+    State.sharedAccessGame = game;
+    document.getElementById('shared-game-title').textContent = game.name;
+    
+    const container = document.getElementById('shared-slots-container');
+    const slots = [];
+    for (let i = 1; i <= game.sharedSlots; i++) {
+        const taken = Math.random() > 0.5;
+        slots.push(`
+            <div class="flex items-center justify-between bg-white/5 p-4 rounded-xl border ${taken ? 'border-red-500/30' : 'border-green-500/30'}">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full ${taken ? 'bg-red-500/20' : 'bg-green-500/20'} flex items-center justify-center">
+                        <i data-lucide="${taken ? 'x' : 'check'}" class="w-5 h-5 ${taken ? 'text-red-500' : 'text-green-500'}"></i>
+                    </div>
+                    <div>
+                        <p class="text-white font-bold text-sm">Slot ${i}</p>
+                        <p class="text-[10px] ${taken ? 'text-red-400' : 'text-green-400'} uppercase font-bold">${taken ? 'Occupied' : 'Available'}</p>
+                    </div>
+                </div>
+                <span class="text-brahma-cyan font-bold">${formatPrice(game.sharedPrice)}</span>
+            </div>
+        `);
+    }
+    
+    container.innerHTML = slots.join('') + `
+        <button onclick="closeModal('shared-slots-modal'); openSharedAccessConfirm();" class="w-full py-4 bg-purple-600 text-white font-black uppercase rounded-xl text-xs tracking-widest mt-4">Request Shared Access</button>
+    `;
+    
+    openModal('shared-slots-modal');
+    lucide.createIcons();
+}
+
+function openSharedAccessConfirm() {
+    openModal('shared-access-confirm-modal');
+}
+
+function executeSharedAccess(confirmed) {
+    closeModal('shared-access-confirm-modal');
+    if (confirmed) {
+        if (State.sharedAccessGame) {
+            addToCart(State.sharedAccessGame.id);
+        }
+    }
+}
+
+// ============ UPI PAYMENT ============
+function openUPIPayment(amount) {
+    closeModal('game-modal');
+    document.getElementById('upi-amt').textContent = amount.toLocaleString('en-IN');
+    
+    // Generate QR
+    const qrContainer = document.getElementById('upi-qr-container');
+    const upiId = 'brahmastra@ybl';
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${upiId}&pn=Brahmastra%20Store&am=${amount}&cu=INR&tn=Game%20Order`;
+    qrContainer.innerHTML = `<img src="${qrUrl}" class="w-48 h-48" alt="QR Code">`;
+    
+    // UPI deep link
+    document.getElementById('open-upi-app-btn').href = `upi://pay?pa=${upiId}&pn=Brahmastra%20Store&am=${amount}&cu=INR`;
+    
+    // Show demo bypass
+    document.getElementById('demo-bypass-btn').classList.remove('hidden');
+    document.getElementById('demo-bypass-btn').style.display = 'flex';
+    
+    openModal('upi-modal');
+}
+
+function verifyAndSubmitPayment() {
+    const utr = document.getElementById('utr-input').value;
+    if (utr.length !== 12) {
+        showCustomAlert('Invalid UTR', 'Please enter a valid 12-digit UTR number', 'error');
+        return;
+    }
+    
+    showCustomAlert('Verifying...', 'Please wait while we verify your payment', 'info');
+    
+    setTimeout(() => {
+        completeUPIPayment();
+    }, 2000);
+}
+
+function demoBypassPayment() {
+    completeUPIPayment();
+}
+
+function completeUPIPayment() {
+    const total = State.cart.reduce((sum, id) => {
+        const game = GAMES.find(g => g.id === id);
+        return sum + (game ? game.price : 0);
+    }, 0);
+    
+    const orderId = generateOrderId();
+    const games = State.cart.map(id => GAMES.find(g => g.id === id)).filter(Boolean);
+    
+    games.forEach(g => {
+        State.orders.unshift({
+            id: orderId,
+            game: g.name,
+            price: g.price,
+            date: new Date().toLocaleDateString(),
+            status: 'Delivered',
+            img: g.img
+        });
+    });
+    
+    State.cart = [];
+    State.loyaltyPoints += Math.floor(total / 10);
+    saveState();
+    updateUI();
+    closeModal('upi-modal');
+    
+    showCustomAlert('Payment Successful!', `Order ${orderId} confirmed! Check WhatsApp for details.`, 'success');
+    showAchievement('Order Placed!', `${formatPrice(total)} purchase complete!`, '🎉');
+    triggerAirdrop();
+}
+
+// ============ SPIN WHEEL ============
+function spinWheel() {
+    if (State.spinUsedToday) {
+        showCustomAlert('Already Spun', 'Come back tomorrow for another spin!', 'warning');
+        return;
+    }
+    
+    const btn = document.getElementById('spin-btn');
+    btn.disabled = true;
+    btn.textContent = 'SPINNING...';
+    
+    const wheel = document.getElementById('spin-wheel');
+    const prize = [5, 10, 25, 50, 100, 0][Math.floor(Math.random() * 6)];
+    const rotation = 1800 + Math.random() * 360;
+    
+    wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+    wheel.style.transform = `rotate(${rotation}deg)`;
+    
+    setTimeout(() => {
+        State.spinUsedToday = true;
+        saveState();
+        
+        if (prize > 0) {
+            State.wallet += prize;
+            saveState();
+            updateUI();
+            document.getElementById('spin-result').classList.remove('hidden');
+            document.getElementById('spin-val').textContent = prize;
+            showAchievement('Spin Winner!', `Won ₹${prize}!`, '🎰');
+        } else {
+            showCustomAlert('Better Luck Next Time', 'Try again tomorrow!', 'warning');
+        }
+        
+        btn.disabled = false;
+        btn.textContent = 'SPIN TO WIN';
+    }, 4500);
+}
+
+// ============ AI BOT ============
+let aiBotOpen = false;
+
+function toggleAIBot() {
+    aiBotOpen = !aiBotOpen;
+    const panel = document.getElementById('ai-bot-panel');
+    
+    if (aiBotOpen) {
+        panel.classList.remove('hidden');
+        panel.classList.add('flex');
+        setTimeout(() => {
+            panel.style.transform = 'translateY(0)';
+            panel.style.opacity = '1';
+        }, 10);
+    } else {
+        panel.style.transform = 'translateY(10px)';
+        panel.style.opacity = '0';
+        setTimeout(() => {
+            panel.classList.add('hidden');
+            panel.classList.remove('flex');
+        }, 300);
+    }
+}
+
+function sendAIMessage() {
+    const input = document.getElementById('ai-bot-input');
+    const message = input.value.trim();
+    if (!message) return;
+    
+    const container = document.getElementById('ai-bot-messages');
+    
+    // User message
+    container.innerHTML += `
+        <div class="flex justify-end">
+            <div class="bg-brahma-purple/30 border border-brahma-purple/50 p-3 rounded-xl rounded-tr-none max-w-[85%]">
+                <p class="text-white text-[11px] leading-relaxed uppercase">${message}</p>
+            </div>
+        </div>
+    `;
+    
+    input.value = '';
+    container.scrollTop = container.scrollHeight;
+    
+    // Show typing
+    const typing = document.getElementById('ai-typing-indicator');
+    typing.classList.remove('hidden');
+    typing.classList.add('flex');
+    
+    // Generate response
+    setTimeout(() => {
+        typing.classList.add('hidden');
+        typing.classList.remove('flex');
+        
+        let response = AI_RESPONSES.default();
+        const msg = message.toLowerCase();
+        
+        if (msg.includes('requirement') || msg.includes('spec') || msg.includes('pc')) {
+            const gameName = message.replace(/requirements?|specs?|pc/gi, '').trim();
+            const game = GAMES.find(g => g.name.toLowerCase().includes(gameName.toLowerCase()));
+            response = game ? AI_RESPONSES.requirements(game.name) : AI_RESPONSES.requirements('Game');
+        } else if (msg.includes('track') || msg.includes('order')) {
+            response = AI_RESPONSES.track();
+        } else if (msg.includes('refund') || msg.includes('cancel')) {
+            response = AI_RESPONSES.refund();
+        } else if (msg.includes('payment') || msg.includes('pay') || msg.includes('upi')) {
+            response = AI_RESPONSES.payment();
+        } else if (msg.includes('shared') || msg.includes('access')) {
+            response = AI_RESPONSES.shared();
+        } else if (msg.includes('contact') || msg.includes('support') || msg.includes('whatsapp')) {
+            response = `📞 Contact Support:\n\n📱 WhatsApp: +91 9313339081\n📧 Email: support@brahmastra.store\n\nWe respond within 5 minutes!`;
+        } else if (msg.includes('hello') || msg.includes('hi') || msg.includes('hey')) {
+            response = `👋 Hello Gamer! How can I help you today?\n\nTry asking about:\n• Game requirements\n• Order tracking\n• Payment methods\n• Shared access`;
+        } else if (msg.includes('thank')) {
+            response = `😊 You're welcome! Happy gaming! 🎮`;
+        }
+        
+        container.innerHTML += `
+            <div class="flex justify-start">
+                <div class="bg-purple-900/20 border border-purple-500/30 p-3 rounded-xl rounded-tl-none max-w-[85%]">
+                    <p class="text-white text-[11px] leading-relaxed uppercase" style="white-space: pre-line;">${response}</p>
+                </div>
+            </div>
+        `;
+        
+        container.scrollTop = container.scrollHeight;
+    }, 1500);
+}
+
+// ============ GLOBAL CHAT ============
+let globalChatOpen = false;
+const CHAT_USERS = ['ProGamer99', 'NightOwl', 'DragonSlayer', 'ShadowHunter', 'CyberNinja', 'PixelKing', 'GhostRider', 'StormBreaker'];
+const CHAT_MESSAGES = [
+    'Just bought Wukong from Brahmastra! Instant delivery 🔥',
+    'Anyone want to play Helldivers 2 tonight?',
+    'Brahmix Pro is insane! 40+ FPS boost!',
+    'GTA VI pre-order kab aayega?',
+    'Shared access for Elden Ring is so cheap!',
+    'Naman bhai rocks! Best service ever',
+    'Daily spin se ₹100 jeeta aaj!',
+    'Cyberpunk 2077 at ₹999 is a steal!',
+    'Elite Pass worth it hai fr fr',
+    'Koi Hogwarts Legacy co-op karega?'
+];
+
+function toggleGlobalChat() {
+    globalChatOpen = !globalChatOpen;
+    const panel = document.getElementById('global-chat-panel');
+    
+    if (globalChatOpen) {
+        panel.classList.remove('hidden');
+        panel.classList.add('flex');
+        startChatSimulation();
+    } else {
+        panel.classList.add('hidden');
+        panel.classList.remove('flex');
+        stopChatSimulation();
+    }
+}
+
+let chatInterval = null;
+
+function startChatSimulation() {
+    const container = document.getElementById('global-chat-messages');
+    
+    chatInterval = setInterval(() => {
+        const user = CHAT_USERS[Math.floor(Math.random() * CHAT_USERS.length)];
+        const msg = CHAT_MESSAGES[Math.floor(Math.random() * CHAT_MESSAGES.length)];
+        const colors = ['text-brahma-cyan', 'text-purple-400', 'text-green-400', 'text-yellow-400', 'text-fuchsia-400'];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        
+        container.innerHTML += `
+            <div class="flex gap-2">
+                <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-bold shrink-0">${user[0]}</div>
+                <div>
+                    <span class="${color} text-[10px] font-bold uppercase">${user}</span>
+                    <p class="text-gray-300 text-[11px] mt-0.5">${msg}</p>
+                </div>
+            </div>
+        `;
+        
+        container.scrollTop = container.scrollHeight;
+        
+        // Update online count
+        const countEl = document.getElementById('online-count');
+        countEl.textContent = 500 + Math.floor(Math.random() * 50);
+    }, 3000 + Math.random() * 5000);
+}
+
+function stopChatSimulation() {
+    if (chatInterval) clearInterval(chatInterval);
+}
+
+function sendMyMessage() {
+    const input = document.getElementById('global-chat-input');
+    const message = input.value.trim();
+    if (!message) return;
+    
+    const container = document.getElementById('global-chat-messages');
+    container.innerHTML += `
+        <div class="flex gap-2 justify-end">
+            <div>
+                <span class="text-brahma-cyan text-[10px] font-bold uppercase text-right block">You</span>
+                <p class="text-white text-[11px] mt-0.5 bg-brahma-cyan/10 p-2 rounded-lg inline-block">${message}</p>
+            </div>
+            <div class="w-8 h-8 rounded-full bg-brahma-cyan/20 flex items-center justify-center text-[10px] font-bold text-brahma-cyan shrink-0">Y</div>
+        </div>
+    `;
+    
+    input.value = '';
+    container.scrollTop = container.scrollHeight;
+}
+
+// ============ POLICY MODAL ============
+function openPolicyModal(policyName) {
+    document.getElementById('policy-title').textContent = policyName;
+    document.getElementById('policy-content').innerHTML = POLICIES[policyName] || '<p>Content not available.</p>';
+    openModal('policy-modal');
+}
+
+// ============ GIFT CARD ============
+function openGiftCardModal() {
+    openModal('gift-card-modal');
+}
+
+function sendGiftCard() {
+    const email = document.getElementById('gift-email').value;
+    const amount = document.getElementById('gift-amount').value;
+    
+    if (!email || !amount) {
+        showCustomAlert('Error', 'Please fill all fields', 'error');
+        return;
+    }
+    
+    showCustomAlert('Gift Sent!', `Gift card of ${formatPrice(parseInt(amount))} sent to ${email}`, 'success');
+    closeModal('gift-card-modal');
+    document.getElementById('gift-email').value = '';
+    document.getElementById('gift-amount').value = '';
+    document.getElementById('gift-message').value = '';
+}
+
+// ============ WELCOME BONUS ============
+function closeWelcomeBonus() {
+    closeModal('welcome-bonus-modal');
+}
+
+function copyBonusCode() {
+    navigator.clipboard.writeText('WELCOME50');
+    showCustomAlert('Copied!', 'Code WELCOME50 copied to clipboard', 'success');
+}
+
+function claimWelcomeBonus() {
+    if (State.welcomeClaimed) {
+        showCustomAlert('Already Claimed', 'You already claimed this bonus!', 'warning');
+        return;
+    }
+    
+    State.wallet += 50;
+    State.welcomeClaimed = true;
+    saveState();
+    updateUI();
+    closeModal('welcome-bonus-modal');
+    showCustomAlert('Bonus Claimed!', '₹50 added to your wallet!', 'success');
+    showAchievement('Welcome Bonus', '₹50 wallet credit claimed!', '🎁');
+}
+
+// ============ REFERRAL ============
+function copyReferral() {
+    const link = document.getElementById('referral-link').value;
+    navigator.clipboard.writeText(link);
+    showCustomAlert('Copied!', 'Referral link copied!', 'success');
+}
+
+// ============ SECRET ACCESS ============
+function applySecretAccess() {
+    const code = document.getElementById('secret-access-input').value.trim().toUpperCase();
+    
+    if (code === 'BRAHMA2026') {
+        State.wallet += 200;
+        State.loyaltyPoints += 500;
+        saveState();
+        updateUI();
+        showCustomAlert('Access Granted!', '₹200 + 500 XP added to your account!', 'success');
+        showAchievement('Secret Unlocked', 'You found the hidden code!', '🔓');
+        document.getElementById('secret-access-input').value = '';
+    } else if (code === 'ELITEFREE') {
+        showCustomAlert('Elite Unlocked!', 'Brahmastra Elite activated for 1 year!', 'success');
+        showAchievement('Elite Access', 'Free Elite Pass activated!', '👑');
+        document.getElementById('secret-access-input').value = '';
+    } else {
+        showCustomAlert('Invalid Code', 'The access code you entered is invalid.', 'error');
+    }
+}
+
+// ============ PERFORMANCE MODE ============
+function togglePerformanceMode() {
+    State.perfMode = !State.perfMode;
+    document.body.classList.toggle('performance-mode', State.perfMode);
+    
+    const btn = document.getElementById('perf-mode-btn');
+    if (State.perfMode) {
+        btn.classList.add('border-yellow-500', 'bg-yellow-500/20');
+        btn.classList.remove('border-white/20', 'bg-white/5');
+        showCustomAlert('Performance Mode', 'Animations disabled for better performance', 'info');
+    } else {
+        btn.classList.remove('border-yellow-500', 'bg-yellow-500/20');
+        btn.classList.add('border-white/20', 'bg-white/5');
+        showCustomAlert('Normal Mode', 'Animations enabled', 'info');
+    }
+}
+
+// ============ VOICE SEARCH ============
+function startJarvisVoice() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        showCustomAlert('Not Supported', 'Voice search is not supported in this browser', 'warning');
+        return;
+    }
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    
+    showCustomAlert('Listening...', 'Speak the game name...', 'info');
+    
+    recognition.onresult = (event) => {
+        const text = event.results[0][0].transcript;
+        document.getElementById('game-search').value = text;
+        handleSearch(text);
+        closeCustomAlert();
+    };
+    
+    recognition.onerror = () => {
+        showCustomAlert('Error', 'Could not understand. Try again.', 'error');
+    };
+    
+    recognition.start();
+}
+
+// ============ AIRDROP ============
+function triggerAirdrop() {
+    const overlay = document.getElementById('airdrop-overlay');
+    const box = document.getElementById('airdrop-box');
+    const game = document.getElementById('airdrop-game');
+    const text = document.getElementById('airdrop-text');
+    
+    overlay.classList.remove('hidden');
+    overlay.classList.add('flex');
+    
+    text.textContent = 'CALLING AIRDROP...';
+    box.classList.remove('hidden');
+    game.classList.add('hidden');
+    
+    setTimeout(() => {
+        text.textContent = 'GAME INCOMING!';
+        box.classList.add('hidden');
+        game.classList.remove('hidden');
+    }, 2000);
+    
+    setTimeout(() => {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+        showAchievement('AIRDROP!', 'Your order is being processed!', '📦');
+    }, 3500);
+}
+
+// ============ BROADCAST BANNER ============
+function showGlobalBroadcast(text) {
+    const banner = document.getElementById('global-broadcast-banner');
+    document.getElementById('global-broadcast-text').textContent = text;
+    banner.classList.remove('hidden');
+    
+    // Adjust nav position
+    document.getElementById('top-banner-ticker').style.marginTop = '36px';
+}
+
+function hideGlobalBanner() {
+    document.getElementById('global-broadcast-banner').classList.add('hidden');
+    document.getElementById('top-banner-ticker').style.marginTop = '0px';
+}
+
+// ============ CAROUSEL 3D ============
+let carouselIndex = 0;
+let carouselGames = [];
+
+function initCarousel() {
+    const container = document.getElementById('carousel-3d');
+    carouselGames = GAMES.slice(0, 9);
+    
+    renderCarousel();
+}
+
+function changeCarouselCategory(cat) {
+    document.querySelectorAll('.carousel-cat-btn').forEach(btn => {
+        btn.className = 'carousel-cat-btn px-5 py-2 border border-white/20 text-white hover:border-brahma-cyan font-bold uppercase rounded-lg text-xs transition-colors tracking-widest';
+    });
+    event.target.className = 'carousel-cat-btn active px-5 py-2 bg-brahma-cyan text-black font-bold uppercase rounded-lg text-xs tracking-widest';
+    
+    if (cat === 'All') {
+        carouselGames = GAMES.slice(0, 9);
+    } else {
+        carouselGames = GAMES.filter(g => g.genre.includes(cat)).slice(0, 9);
+    }
+    
+    carouselIndex = 0;
+    renderCarousel();
+}
+
+function renderCarousel() {
+    const container = document.getElementById('carousel-3d');
+    container.innerHTML = '';
+    
+    const count = carouselGames.length;
+    const angle = 360 / count;
+    const radius = 350;
+    
+    carouselGames.forEach((game, i) => {
+        const card = document.createElement('div');
+        card.className = 'carousel-card';
+        card.onclick = () => openGameModal(game.id);
+        
+        const currentAngle = angle * i;
+        card.style.transform = `rotateY(${currentAngle}deg) translateZ(${radius}px)`;
+        
+        card.innerHTML = `
+            <img src="${game.img}" alt="${game.name}">
+            <div class="card-overlay">
+                <h4 class="text-white font-bold text-sm uppercase">${game.name}</h4>
+                <p class="text-brahma-cyan font-bold text-xs mt-1">${formatPrice(game.price)}</p>
+            </div>
+        `;
+        
+        container.appendChild(card);
+    });
+    
+    updateCarousel();
+}
+
+function rotateCarousel(dir) {
+    carouselIndex += dir === 'next' ? 1 : -1;
+    updateCarousel();
+}
+
+function updateCarousel() {
+    const container = document.getElementById('carousel-3d');
+    const cards = container.querySelectorAll('.carousel-card');
+    const count = cards.length;
+    const angle = 360 / count;
+    
+    container.style.transform = `rotateY(${-angle * carouselIndex}deg)`;
+}
+
+// Auto-rotate carousel
+setInterval(() => rotateCarousel('next'), 5000);
+
+// ============ UPCOMING CUBE ============
+function initCube() {
+    const cube = document.getElementById('upcoming-cube');
+    
+    UPCOMING.forEach(game => {
+        const face = document.createElement('div');
+        face.className = 'cube-face';
+        face.innerHTML = `
+            <img src="${game.img}" alt="${game.name}">
+            <div class="absolute inset-0 flex items-center justify-center bg-black/60">
+                <div class="text-center">
+                    <p class="text-white font-display font-bold text-sm uppercase">${game.name}</p>
+                    <p class="text-brahma-cyan text-[10px] font-bold mt-1">2026</p>
+                </div>
+            </div>
+        `;
+        cube.appendChild(face);
+    });
+}
+
+// ============ REVIEW SLIDER ============
+function initReviewSlider() {
+    const slider = document.getElementById('global-review-slider');
+    
+    // Duplicate for infinite scroll
+    const allReviews = [...REVIEWS, ...REVIEWS];
+    
+    slider.innerHTML = allReviews.map(review => `
+        <div class="min-w-[300px] bg-white/5 p-6 rounded-2xl border border-white/10 mx-3 shrink-0">
+            <div class="flex items-center gap-1 mb-3">
+                ${Array(5).fill(0).map((_, i) => `<i data-lucide="star" class="w-3 h-3 ${i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-600'}"></i>`).join('')}
+            </div>
+            <p class="text-gray-300 text-sm leading-relaxed mb-4">"${review.text}"</p>
+            <div class="flex items-center gap-2">
+                <span class="text-xl">${review.avatar}</span>
+                <span class="text-white font-bold text-sm">${review.name}</span>
+                <span class="text-green-400 text-[10px]">✓ Verified</span>
+            </div>
+        </div>
+    `).join('');
+    
+    lucide.createIcons();
+}
+
+// ============ FLASH SALE TIMER ============
+function startFlashSaleTimer() {
+    let hours = 2, minutes = 15, seconds = 30;
+    
+    setInterval(() => {
+        seconds--;
+        if (seconds < 0) { seconds = 59; minutes--; }
+        if (minutes < 0) { minutes = 59; hours--; }
+        if (hours < 0) { hours = 23; minutes = 59; seconds = 59; }
+        
+        const timer = document.getElementById('flash-sale-timer');
+        if (timer) {
+            timer.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+    }, 1000);
+}
+
+// ============ SCROLL TO TOP ============
+window.addEventListener('scroll', () => {
+    const btn = document.getElementById('scroll-to-top');
+    if (window.pageYOffset > 500) {
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
+        btn.style.transform = 'translateY(0)';
+    } else {
+        btn.style.opacity = '0';
+        btn.style.pointerEvents = 'none';
+        btn.style.transform = 'translateY(10px)';
+    }
+});
+
+// ============ PARALLAX ENGINE ============
+const ParallaxEngine = {
+    rafId: null,
+    scrollY: 0,
+    windowHeight: 0,
+    elements: [],
+    
+    init() {
+        this.windowHeight = window.innerHeight;
+        this.cacheElements();
+        this.bindEvents();
+        this.tick();
+    },
+    
+    cacheElements() {
+        this.elements = [];
+        document.querySelectorAll('.parallax-wrap').forEach(wrap => {
+            const card = wrap.querySelector('.parallax-card');
+            if (card) this.elements.push({ type: 'card', wrap, card, depthImg: wrap.querySelector('.p-depth-img'), depthContent: wrap.querySelector('.p-depth-content'), depthBadge: wrap.querySelector('.p-depth-badge'), rect: null });
+        });
+        document.querySelectorAll('.logo-3d-container').forEach(logo => {
+            const inner = logo.querySelector('.logo-3d-inner');
+            if (inner) this.elements.push({ type: 'logo', el: logo, inner, rect: null });
+        });
+        document.querySelectorAll('.elite-container').forEach(container => {
+            const card = container.querySelector('.elite-card');
+            if (card) {
+                this.elements.push({ type: 'elite', card, content: card.querySelector('.elite-content'), badge: card.querySelector('.elite-badge'), rect: null });
+                container.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    card.style.setProperty('--mouse-x', ((e.clientX - rect.left) / rect.width * 100) + '%');
+                    card.style.setProperty('--mouse-y', ((e.clientY - rect.top) / rect.height * 100) + '%');
+                    card.style.transform = `perspective(1000px) rotateX(${((e.clientY - rect.top) / rect.height - 0.5) * -8}deg) rotateY(${((e.clientX - rect.left) / rect.width - 0.5) * 8}deg) scale3d(1.02,1.02,1.02)`;
+                });
+                container.addEventListener('mouseleave', () => { card.style.transform = ''; });
+            }
+        });
+        document.querySelectorAll('#games-grid > div').forEach(item => {
+            item.addEventListener('mousemove', (e) => {
+                const rect = item.getBoundingClientRect();
+                item.style.transform = `perspective(800px) rotateX(${((e.clientY - rect.top) / rect.height - 0.5) * -10}deg) rotateY(${((e.clientX - rect.left) / rect.width - 0.5) * 10}deg) translateZ(15px)`;
+            });
+            item.addEventListener('mouseleave', () => { item.style.transform = ''; });
+        });
+    },
+    
+    bindEvents() {
+        window.addEventListener('scroll', () => { this.scrollY = window.pageYOffset; }, { passive: true });
+        window.addEventListener('resize', () => { this.windowHeight = window.innerHeight; }, { passive: true });
+    },
+    
+    tick() {
+        this.elements.forEach(el => {
+            el.rect = el.wrap?.getBoundingClientRect() || el.el?.getBoundingClientRect() || el.card?.getBoundingClientRect();
+            if (!el.rect || el.rect.bottom < -100 || el.rect.top > this.windowHeight + 100) return;
+            
+            const dist = (el.rect.top + el.rect.height / 2 - this.windowHeight / 2) / this.windowHeight;
+            
+            if (el.type === 'card') {
+                el.card.style.transform = `rotateY(${dist * -15}deg) rotateX(${dist * 8}deg) translateZ(${Math.abs(dist) * -30}px)`;
+                if (el.depthImg) el.depthImg.style.transform = `translateZ(-40px) scale(1.12) translateY(${dist * -20}px)`;
+                if (el.depthContent) el.depthContent.style.transform = `translateZ(-15px) translateY(${dist * -8}px)`;
+                if (el.depthBadge) el.depthBadge.style.transform = `translateZ(25px) translateY(${dist * -5}px)`;
+            } else if (el.type === 'logo') {
+                el.inner.style.transform = `rotateY(${dist * -10}deg) translateZ(${Math.abs(dist) * -20}px) scale(${Math.max(0.8, 1 + Math.abs(dist) * -0.1)})`;
+            }
+        });
+        this.rafId = requestAnimationFrame(() => this.tick());
+    }
+};
+
+// ============ SCROLL REVEAL ============
+function initScrollReveal() {
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+    
+    document.querySelectorAll('section, main > div').forEach((el, i) => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(30px)';
+        el.style.transition = `opacity 0.6s ease-out ${i * 0.05}s, transform 0.6s ease-out ${i * 0.05}s`;
+        observer.observe(el);
+    });
+}
+
+// ============ SCROLL PROGRESS BAR ============
+function initScrollProgress() {
+    const bar = document.createElement('div');
+    bar.id = 'scroll-progress-bar';
+    bar.style.cssText = 'position:fixed;top:32px;left:0;height:2px;background:linear-gradient(90deg,#06b6d4,#7c3aed);z-index:999;transition:width 0.1s linear;box-shadow:0 0 10px rgba(6,182,212,0.5);';
+    document.body.appendChild(bar);
+    
+    window.addEventListener('scroll', () => {
+        const progress = (window.pageYOffset / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
+        bar.style.width = progress + '%';
+    }, { passive: true });
+}
+
+// ============ INITIALIZATION ============
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🎮 Brahmastra Game Store Initializing...');
+    
+    // Load saved state
+    loadState();
+    
+    // Initialize Lucide icons
+    lucide.createIcons();
+    
+    // Render catalog
+    renderCatalog();
+    
+    // Initialize components
+    initCarousel();
+    initCube();
+    initReviewSlider();
+    startFlashSaleTimer();
+    
+    // Initialize effects
+    setTimeout(() => {
+        ParallaxEngine.init();
+        initScrollReveal();
+        initScrollProgress();
+    }, 300);
+    
+    // Update UI
+    updateUI();
+    renderRecentlyViewed();
+    
+    // Check auth state
+    if (auth) {
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                State.user = { email: user.email, uid: user.uid };
+                if (db) {
+                    db.collection('users').doc(user.uid).get().then(doc => {
+                        if (doc.exists) {
+                            State.wallet = doc.data().wallet || 0;
+                            State.loyaltyPoints = doc.data().loyaltyPoints || 0;
+                        }
+                        saveState();
+                        updateUI();
+                    });
+                }
+            } else {
+                State.user = null;
+                updateUI();
+            }
+        });
+    }
+    
+    // Show broadcast after 5 seconds
+    setTimeout(() => {
+        showGlobalBroadcast('⚡ FLASH SALE: Use code BRAHMA20 for 20% OFF on all games!');
+    }, 5000);
+    
+    // Show achievement for returning users
+    if (State.orders.length > 0) {
+        setTimeout(() => {
+            showAchievement('Welcome Back', `${State.orders.length} orders in history!`, '🏠');
+        }, 3000);
+    }
+    
+    console.log('✅ Brahmastra Ready!');
+});
+
+// Visibility change handler
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        stopChatSimulation();
+    } else if (globalChatOpen) {
+        startChatSimulation();
+    }
+/* ============================================
+   REAL-TIME SYNC ENGINE
+   Admin Panel → Website Live Updates
+   ============================================ */
+
+const RealtimeSync = {
+    channel: null,
+    lastTimestamps: {},
+    
+    init() {
+        // BroadcastChannel for same-browser tabs
+        try {
+            this.channel = new BroadcastChannel('brahmastra_sync');
+            this.channel.onmessage = (e) => this.handleMessage(e.data);
+            console.log('📡 RealtimeSync: BroadcastChannel connected');
+        } catch(e) {
+            console.warn('BroadcastChannel not supported, using polling');
+        }
+        
+        // Load initial overrides
+        this.loadAllOverrides();
+        
+        // Polling fallback (every 2 seconds)
+        setInterval(() => this.pollForChanges(), 2000);
+        
+        // Listen for storage events from other tabs
+        window.addEventListener('storage', (e) => {
+            if (e.key && e.key.startsWith('brahmastra_')) {
+                this.loadAllOverrides();
+            }
+        });
+    },
+    
+    handleMessage(data) {
+        if (!data || !data.type) return;
+        console.log('📡 Realtime update:', data.type);
+        
+        switch(data.type) {
+            case 'games':
+                this.applyGames(data.data);
+                break;
+            case 'deals':
+                this.applyDeals(data.data);
+                break;
+            case 'banner':
+                this.applyBanner(data.data);
+                break;
+            case 'broadcast':
+                this.applyBroadcast(data.data);
+                break;
+            case 'reviews':
+                this.applyReviews(data.data);
+                break;
+            case 'wallet':
+                if (State.user && data.data.email === State.user.email) {
+                    State.wallet = data.data.wallet;
+                    saveState();
+                    updateUI();
+                    showCustomAlert('Wallet Updated!', `New balance: ${formatPrice(State.wallet)}`, 'info');
+                }
+                break;
+            case 'secret_codes':
+                // Codes update in real-time via applySecretAccess
+                break;
+        }
+    },
+    
+    pollForChanges() {
+        const keys = ['brahmastra_games_ts', 'brahmastra_deals_ts', 'brahmastra_banner_ts', 'brahmastra_broadcast_ts', 'brahmastra_reviews_ts'];
+        
+        keys.forEach(key => {
+            const ts = localStorage.getItem(key);
+            const type = key.replace('_ts', '').replace('brahmastra_', '');
+            
+            if (ts && this.lastTimestamps[type] !== ts) {
+                this.lastTimestamps[type] = ts;
+                this.loadOverride(type);
+            }
+        });
+    },
+    
+    loadAllOverrides() {
+        this.loadOverride('games');
+        this.loadOverride('deals');
+        this.loadOverride('banner');
+        this.loadOverride('broadcast');
+        this.loadOverride('reviews');
+    },
+    
+    loadOverride(type) {
+        try {
+            const data = JSON.parse(localStorage.getItem('brahmastra_' + type));
+            if (!data) return;
+            
+            switch(type) {
+                case 'games': this.applyGames(data); break;
+                case 'deals': this.applyDeals(data); break;
+                case 'banner': this.applyBanner(data); break;
+                case 'broadcast': this.applyBroadcast(data); break;
+                case 'reviews': this.applyReviews(data); break;
+            }
+        } catch(e) {}
+    },
+    
+    applyGames(games) {
+        if (!Array.isArray(games) || games.length === 0) return;
+        
+        // Override the GAMES array reference
+        window.GAMES.length = 0;
+        games.forEach(g => window.GAMES.push(g));
+        
+        renderCatalog();
+        renderRecentlyViewed();
+        initCarousel();
+        initCube();
+        console.log('🔄 Games updated in real-time:', games.length, 'games');
+    },
+    
+    applyDeals(deals) {
+        if (!deals) return;
+        
+        if (deals.d1) {
+            const el1 = document.getElementById('deal-name-1');
+            const pr1 = document.getElementById('deal-price-1');
+            if (el1) el1.textContent = deals.d1.name;
+            if (pr1) pr1.textContent = '₹' + (deals.d1.price || 0).toLocaleString('en-IN');
+        }
+        if (deals.d2) {
+            const el2 = document.getElementById('deal-name-2');
+            const pr2 = document.getElementById('deal-price-2');
+            if (el2) el2.textContent = deals.d2.name;
+            if (pr2) pr2.textContent = '₹' + (deals.d2.price || 0).toLocaleString('en-IN');
+        }
+        if (deals.d3) {
+            const el3 = document.getElementById('deal-name-3');
+            const pr3 = document.getElementById('deal-price-3');
+            if (el3) el3.textContent = deals.d3.name;
+            if (pr3) pr3.textContent = '₹' + (deals.d3.price || 0).toLocaleString('en-IN');
+        }
+        console.log('🔄 Deals updated in real-time');
+    },
+    
+    applyBanner(items) {
+        if (!Array.isArray(items) || items.length === 0) return;
+        
+        const container = document.getElementById('top-banner-content');
+        if (!container) return;
+        
+        // Duplicate for seamless loop
+        const allItems = [...items, ...items];
+        container.innerHTML = allItems.map(item => 
+            `<span>${item}</span>`
+        ).join('');
+        console.log('🔄 Banner updated in real-time');
+    },
+    
+    applyBroadcast(data) {
+        if (!data) return;
+        
+        if (data.active && data.text) {
+            showGlobalBroadcast(data.text);
+        } else {
+            hideGlobalBanner();
+        }
+        console.log('🔄 Broadcast updated in real-time');
+    },
+    
+    applyReviews(reviews) {
+        if (!Array.isArray(reviews) || reviews.length === 0) return;
+        
+        // Update the global REVIEWS array
+        window.REVIEWS.length = 0;
+        reviews.forEach(r => window.REVIEWS.push(r));
+        
+        // Re-render review slider
+        initReviewSlider();
+        console.log('🔄 Reviews updated in real-time:', reviews.length, 'reviews');
+    }
+};
+
+// Override applySecretAccess to use dynamic codes
+const _originalApplySecretAccess = applySecretAccess;
+applySecretAccess = function() {
+    const code = document.getElementById('secret-access-input').value.trim().toUpperCase();
+    
+    // Check dynamic codes from admin
+    try {
+        const dynamicCodes = JSON.parse(localStorage.getItem('brahmastra_secret_codes') || '{}');
+        if (dynamicCodes[code]) {
+            const data = dynamicCodes[code];
+            if (data.reward > 0) State.wallet += data.reward;
+            if (data.xp > 0) State.loyaltyPoints += data.xp;
+            saveState();
+            updateUI();
+            showCustomAlert('Access Granted!', `₹${data.reward} + ${data.xp} XP added!`, 'success');
+            showAchievement('Secret Unlocked', 'You found a hidden code!', '🔓');
+            document.getElementById('secret-access-input').value = '';
+            return;
+        }
+    } catch(e) {}
+    
+    // Fallback to hardcoded codes
+    _originalApplySecretAccess();
+};
+
+// THEME SYNC LOGIC (Add in app.js)
+function applyTheme(data) {
+    if(data.bg) document.body.style.backgroundColor = data.bg;
+    if(data.primary) {
+        // CSS Variable update for primary color
+        document.documentElement.style.setProperty('--brahma-cyan', data.primary);
+        // Update buttons/text manually if needed
+        document.querySelectorAll('.text-brahma-cyan').forEach(el => el.style.color = data.primary);
+    }
+}
+
+// Inside RealtimeSync.handleMessage switch case:
+case 'hero_video':
+    const vid = document.getElementById('site-hero-video');
+    if(vid) {
+        vid.src = data.data; // Set new source
+        vid.load();
+        vid.play().catch(e => console.log("Autoplay blocked"));
+    }
+    break;
+
+// Listen for theme changes
+if(typeof RealtimeSync !== 'undefined') {
+    // Override or add to RealtimeSync.handleMessage
+    const originalHandle = RealtimeSync.handleMessage;
+    RealtimeSync.handleMessage = function(data) {
+        if(data.type === 'theme') applyTheme(data.data);
+        if(originalHandle) originalHandle.call(this, data);
+    };
+}
+// Initialize RealtimeSync after DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => RealtimeSync.init(), 1000);
+});
+
+// Admin quick-access: triple-click on wallet display
+document.addEventListener('DOMContentLoaded', () => {
+    const walletEl = document.getElementById('wallet-balance-display');
+    if (walletEl) {
+        let clickCount = 0;
+        let clickTimer;
+        walletEl.addEventListener('click', () => {
+            clickCount++;
+            clearTimeout(clickTimer);
+            clickTimer = setTimeout(() => { clickCount = 0; }, 500);
+            
+            if (clickCount >= 5) {
+                clickCount = 0;
+                window.open('admin.html', '_blank');
+            }
+        });
+    }
+});

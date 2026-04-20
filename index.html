@@ -17,6 +17,325 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
 
     <script>
+// Ticket System Variables
+let currentTicketId = null;
+let ticketListener = null;
+let userTicketsListener = null;
+
+// Initialize Ticket Listeners
+function initTicketSystem() {
+    if(auth && auth.currentUser) {
+        listenToUserTickets();
+    }
+}
+
+// Toggle Ticket Panel
+function toggleTicketPanel() {
+    playClick();
+    const panel = document.getElementById('ticket-panel');
+    if(panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        setTimeout(() => panel.classList.add('hidden'), 300);
+    } else {
+        panel.classList.remove('hidden');
+        setTimeout(() => panel.classList.add('active'), 10);
+        if(!isLoggedIn) {
+            toggleTicketPanel(); // Close
+            openAuthModal();
+            return;
+        }
+        switchTicketTab('my-tickets'); // Default to my tickets
+    }
+}
+
+// Switch Ticket Tabs
+function switchTicketTab(tab) {
+    playClick();
+    const newBtn = document.getElementById('ticket-tab-new');
+    const myBtn = document.getElementById('ticket-tab-my');
+    const newContent = document.getElementById('ticket-content-new');
+    const myContent = document.getElementById('ticket-content-my-tickets');
+    
+    if(tab === 'new') {
+        newBtn.className = 'flex-1 py-3 text-xs font-bold text-purple-400 border-b-2 border-purple-400 uppercase tracking-widest';
+        myBtn.className = 'flex-1 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest';
+        newContent.classList.remove('hidden');
+        myContent.classList.add('hidden');
+    } else {
+        newBtn.className = 'flex-1 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest';
+        myBtn.className = 'flex-1 py-3 text-xs font-bold text-purple-400 border-b-2 border-purple-400 uppercase tracking-widest';
+        newContent.classList.add('hidden');
+        myContent.classList.remove('hidden');
+        loadUserTickets();
+    }
+}
+
+// Submit New Ticket
+async function submitTicket() {
+    playClick();
+    if(!isLoggedIn || !auth.currentUser) return alert("Please login first");
+    
+    const category = document.getElementById('ticket-category').value;
+    const subject = document.getElementById('ticket-subject').value.trim();
+    const details = document.getElementById('ticket-details').value.trim();
+    const orderId = document.getElementById('ticket-order-id').value.trim();
+    const screenshot = document.getElementById('ticket-screenshot').value.trim();
+    
+    if(!subject || !details) return alert("Please fill subject and details");
+    
+    const ticketData = {
+        uid: auth.currentUser.uid,
+        userEmail: currentUserData.email,
+        userName: currentUserData.username,
+        category: category,
+        subject: subject,
+        details: details,
+        orderId: orderId || null,
+        screenshot: screenshot || null,
+        status: 'open',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+        messages: [{
+            sender: 'user',
+            text: details,
+            timestamp: Date.now(),
+            screenshot: screenshot || null
+        }]
+    };
+    
+    try {
+        const docRef = await db.collection('tickets').add(ticketData);
+        
+        // Create admin notification
+        await db.collection('admin_notifications').add({
+            type: 'new_ticket',
+            ticketId: docRef.id,
+            userEmail: currentUserData.email,
+            subject: subject,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            read: false
+        });
+        
+        alert(`Ticket Created! ID: ${docRef.id.substr(-6).toUpperCase()}`);
+        
+        // Clear form
+        document.getElementById('ticket-subject').value = '';
+        document.getElementById('ticket-details').value = '';
+        document.getElementById('ticket-order-id').value = '';
+        document.getElementById('ticket-screenshot').value = '';
+        
+        switchTicketTab('my-tickets');
+        playSuccess();
+    } catch(e) {
+        alert("Error creating ticket: " + e.message);
+    }
+}
+
+// Load User Tickets
+function listenToUserTickets() {
+    if(!auth.currentUser) return;
+    
+    if(userTicketsListener) userTicketsListener();
+    
+    userTicketsListener = db.collection('tickets')
+        .where('uid', '==', auth.currentUser.uid)
+        .orderBy('lastUpdated', 'desc')
+        .onSnapshot(snapshot => {
+            const container = document.getElementById('my-tickets-list');
+            const badge = document.getElementById('ticket-badge');
+            let unreadCount = 0;
+            
+            if(snapshot.empty) {
+                container.innerHTML = '<p class="text-center text-gray-500 text-sm py-8 uppercase tracking-widest">No tickets yet</p>';
+                badge.classList.add('hidden');
+                return;
+            }
+            
+            let html = '';
+            snapshot.forEach(doc => {
+                const t = doc.data();
+                const statusClass = t.status === 'open' ? 'ticket-status-open' : 
+                                   t.status === 'resolved' ? 'ticket-status-resolved' : 'ticket-status-pending';
+                const lastMsg = t.messages && t.messages.length > 0 ? t.messages[t.messages.length-1].text : 'No messages';
+                const hasUnread = t.lastReply && t.lastReply !== 'user';
+                
+                if(hasUnread) unreadCount++;
+                
+                html += `
+                <div class="ticket-card bg-black/40 border border-white/10 p-4 rounded-xl cursor-pointer hover:bg-white/5 transition-all" onclick="openTicketChat('${doc.id}')">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase">#${doc.id.substr(-6).toUpperCase()}</span>
+                        <span class="text-[9px] px-2 py-1 rounded uppercase font-bold ${statusClass}">${t.status}</span>
+                    </div>
+                    <h4 class="text-white font-bold text-sm mb-1 uppercase truncate">${t.subject}</h4>
+                    <p class="text-[10px] text-gray-500 truncate uppercase">${lastMsg}</p>
+                    <div class="mt-2 flex items-center justify-between">
+                        <span class="text-[9px] text-purple-400 uppercase">${t.category}</span>
+                        ${hasUnread ? '<span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>' : ''}
+                    </div>
+                </div>`;
+            });
+            
+            container.innerHTML = html;
+            
+            if(unreadCount > 0) {
+                badge.innerText = unreadCount;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        });
+}
+
+// Open Ticket Chat
+async function openTicketChat(ticketId) {
+    playClick();
+    currentTicketId = ticketId;
+    const modal = document.getElementById('ticket-chat-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    
+    // Load ticket data
+    const doc = await db.collection('tickets').doc(ticketId).get();
+    if(!doc.exists) return alert("Ticket not found");
+    
+    const data = doc.data();
+    document.getElementById('chat-ticket-id').innerText = '#' + ticketId.substr(-6).toUpperCase();
+    document.getElementById('chat-ticket-subject').innerText = data.subject;
+    
+    const statusEl = document.getElementById('chat-ticket-status');
+    statusEl.innerText = data.status;
+    statusEl.className = `text-[10px] px-2 py-1 rounded font-bold uppercase ticket-status-${data.status}`;
+    
+    // Disable input if resolved
+    const replyBox = document.getElementById('ticket-reply-box');
+    if(data.status === 'resolved') {
+        replyBox.innerHTML = '<p class="text-center text-green-500 font-bold uppercase text-xs py-2">This ticket has been resolved</p>';
+    } else {
+        replyBox.innerHTML = `
+            <div class="flex gap-2">
+                <input type="text" id="ticket-reply-input" placeholder="Type your reply..." class="flex-1 bg-black border border-white/20 text-white px-4 py-3 rounded-xl outline-none focus:border-purple-500 text-xs uppercase">
+                <button onclick="sendTicketReply()" class="bg-purple-600 text-white px-4 rounded-xl hover:bg-purple-500 transition-colors"><i data-lucide="send" class="w-5 h-5"></i></button>
+            </div>
+        `;
+        lucide.createIcons();
+    }
+    
+    renderTicketMessages(data.messages || []);
+    
+    // Listen for updates
+    if(ticketListener) ticketListener();
+    ticketListener = db.collection('tickets').doc(ticketId).onSnapshot(snap => {
+        if(snap.exists) renderTicketMessages(snap.data().messages || []);
+    });
+    
+    // Mark as read
+    if(data.lastReply && data.lastReply !== 'user') {
+        db.collection('tickets').doc(ticketId).update({ lastReply: 'user' });
+    }
+}
+
+// Render Messages
+function renderTicketMessages(messages) {
+    const container = document.getElementById('ticket-messages-container');
+    container.innerHTML = '';
+    
+    messages.forEach((msg, idx) => {
+        const isUser = msg.sender === 'user';
+        const align = isUser ? 'justify-end' : 'justify-start';
+        const bg = isUser ? 'bg-purple-600/30 border-purple-500/30' : 'bg-white/10 border-white/10';
+        const name = isUser ? 'You' : (msg.adminName || 'Support Agent');
+        
+        let attachmentHtml = '';
+        if(msg.screenshot) {
+            attachmentHtml = `<img src="${msg.screenshot}" class="ticket-attachment mt-2 cursor-pointer hover:opacity-80 transition-opacity" onclick="window.open('${msg.screenshot}')" alt="Attachment">`;
+        }
+        
+        container.innerHTML += `
+        <div class="flex ${align} ticket-message">
+            <div class="${bg} border rounded-2xl p-3 max-w-[80%] ${isUser ? 'rounded-tr-none' : 'rounded-tl-none'}">
+                <p class="text-[9px] ${isUser ? 'text-purple-300' : 'text-brahma-cyan'} font-bold mb-1 uppercase">${name}</p>
+                <p class="text-white text-[11px] leading-relaxed uppercase">${msg.text}</p>
+                ${attachmentHtml}
+                <p class="text-[8px] text-gray-500 mt-1 text-right uppercase">${new Date(msg.timestamp).toLocaleTimeString()}</p>
+            </div>
+        </div>`;
+    });
+    
+    container.scrollTop = container.scrollHeight;
+    lucide.createIcons();
+}
+
+// Send Reply
+async function sendTicketReply() {
+    const input = document.getElementById('ticket-reply-input');
+    const text = input.value.trim();
+    if(!text || !currentTicketId) return;
+    
+    playClick();
+    const newMsg = {
+        sender: 'user',
+        text: text,
+        timestamp: Date.now()
+    };
+    
+    await db.collection('tickets').doc(currentTicketId).update({
+        messages: firebase.firestore.FieldValue.arrayUnion(newMsg),
+        lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+        lastReply: 'user',
+        status: 'open' // Reopen if was pending
+    });
+    
+    // Notify admin
+    await db.collection('admin_notifications').add({
+        type: 'ticket_reply',
+        ticketId: currentTicketId,
+        userEmail: currentUserData.email,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        read: false
+    });
+    
+    input.value = '';
+}
+
+// Admin Functions for Tickets (Add to Admin Panel)
+function adminLoadTickets() {
+    if(!db || currentUserData.role !== 'admin') return;
+    
+    db.collection('tickets').orderBy('lastUpdated', 'desc').onSnapshot(snapshot => {
+        const container = document.getElementById('admin-tickets-list'); // Create this div in admin panel
+        if(!container) return;
+        
+        let html = '';
+        snapshot.forEach(doc => {
+            const t = doc.data();
+            const statusColor = t.status === 'open' ? 'text-yellow-500' : 'text-green-500';
+            html += `
+            <div class="bg-black/40 border border-white/10 p-3 rounded-lg mb-2 flex justify-between items-center">
+                <div>
+                    <p class="text-xs text-white font-bold uppercase">${t.subject}</p>
+                    <p class="text-[9px] text-gray-400 uppercase">${t.userEmail} | ${t.category}</p>
+                </div>
+                <div class="flex gap-2">
+                    <span class="text-[9px] ${statusColor} font-bold uppercase">${t.status}</span>
+                    <button onclick="adminOpenTicket('${doc.id}')" class="text-purple-400 text-[9px] uppercase font-bold">View</button>
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    });
+}
+
+// Resolve Ticket (Admin)
+async function adminResolveTicket(ticketId) {
+    await db.collection('tickets').doc(ticketId).update({
+        status: 'resolved',
+        resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        resolvedBy: auth.currentUser.email
+    });
+    alert("Ticket resolved!");
+}
+
         tailwind.config = {
             darkMode: 'class',
             theme: {
@@ -66,6 +385,39 @@
             transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             will-change: transform;
         }
+	/* Ticket System Styles */
+	#ticket-panel {
+    	transform: translateX(100%);
+    	transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	#ticket-panel.active {
+    	transform: translateX(0);
+    	display: flex !important;
+	}
+	.ticket-message {
+    	animation: slideInUp 0.3s ease-out;
+	}
+	@keyframes slideInUp {
+    	from { transform: translateY(10px); opacity: 0; }
+    	to { transform: translateY(0); opacity: 1; }
+	}
+	.ticket-card {
+    	transition: all 0.3s ease;
+    	border-left: 3px solid transparent;
+	}
+	.ticket-card:hover {
+    	border-left-color: #a855f7;
+    	transform: translateX(5px);
+	}	
+	.ticket-status-open { background: rgba(234, 179, 8, 0.2); color: #eab308; }
+	.ticket-status-resolved { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+	.ticket-status-pending { background: rgba(147, 51, 234, 0.2); color: #a855f7; }
+	.ticket-attachment {
+    	max-width: 200px;
+   	 border-radius: 8px;
+    	border: 1px solid rgba(255,255,255,0.1);
+	}
+
         .logo-3d-container:hover .logo-3d-inner {
             animation-play-state: paused;
             transform: scale(1.15) translateZ(30px);
@@ -3609,5 +3961,111 @@
     </div>
 </div>
 <script src="app.js"></script>
+<!-- Ticket Support Button -->
+<button onclick="toggleTicketPanel()" class="fixed bottom-24 left-6 z-[95] bg-purple-600 text-white p-4 rounded-full shadow-[0_0_20px_rgba(147,51,234,0.5)] hover:scale-110 transition-transform flex items-center justify-center group">
+    <i data-lucide="ticket" class="w-6 h-6"></i>
+    <div id="ticket-badge" class="absolute -top-1 -right-1 bg-red-500 text-[9px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-black hidden">0</div>
+    <span class="absolute left-20 bg-black border border-white/10 text-white text-xs px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Support Ticket</span>
+</button>
+
+<!-- Ticket Panel -->
+<div id="ticket-panel" class="fixed inset-y-0 right-0 w-full md:w-[420px] bg-[#0a0a0a]/95 backdrop-blur-xl z-[200] hidden flex-col border-l border-purple-500/30 shadow-2xl">
+    
+    <!-- Header -->
+    <div class="p-4 border-b border-white/10 flex justify-between items-center bg-purple-900/20">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center border border-purple-500/50">
+                <i data-lucide="headset" class="w-5 h-5 text-purple-400"></i>
+            </div>
+            <div>
+                <h3 class="text-white font-bold text-sm uppercase tracking-widest">Support Center</h3>
+                <p class="text-[10px] text-green-400 font-bold flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span> We reply in 5 mins
+                </p>
+            </div>
+        </div>
+        <button onclick="toggleTicketPanel()" class="text-gray-400 hover:text-white p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-white/10">
+        <button onclick="switchTicketTab('new')" id="ticket-tab-new" class="flex-1 py-3 text-xs font-bold text-purple-400 border-b-2 border-purple-400 uppercase tracking-widest">New Ticket</button>
+        <button onclick="switchTicketTab('my-tickets')" id="ticket-tab-my" class="flex-1 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest">My Tickets</button>
+    </div>
+
+    <!-- Content -->
+    <div class="flex-1 overflow-y-auto">
+        
+        <!-- New Ticket Form -->
+        <div id="ticket-content-new" class="p-4 space-y-4">
+            <div>
+                <label class="text-[10px] text-gray-500 uppercase tracking-widest block mb-2">Category</label>
+                <select id="ticket-category" class="w-full bg-black border border-white/20 text-white p-3 rounded-xl outline-none focus:border-purple-500 uppercase text-xs tracking-wider">
+                    <option value="payment">Payment Issue</option>
+                    <option value="delivery">Game Delivery</option>
+                    <option value="technical">Technical Problem</option>
+                    <option value="refund">Refund Request</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-500 uppercase tracking-widest block mb-2">Subject</label>
+                <input type="text" id="ticket-subject" placeholder="Brief description of problem" class="w-full bg-black border border-white/20 text-white p-3 rounded-xl outline-none focus:border-purple-500 uppercase text-xs">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-500 uppercase tracking-widest block mb-2">Order ID (if applicable)</label>
+                <input type="text" id="ticket-order-id" placeholder="e.g., ORD-123456" class="w-full bg-black border border-white/20 text-white p-3 rounded-xl outline-none focus:border-purple-500 uppercase text-xs">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-500 uppercase tracking-widest block mb-2">Details</label>
+                <textarea id="ticket-details" rows="4" placeholder="Describe your problem in detail..." class="w-full bg-black border border-white/20 text-white p-3 rounded-xl outline-none focus:border-purple-500 resize-none uppercase text-xs"></textarea>
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-500 uppercase tracking-widest block mb-2">Screenshot URL (Optional)</label>
+                <input type="text" id="ticket-screenshot" placeholder="https://i.imgur.com/..." class="w-full bg-black border border-white/20 text-white p-3 rounded-xl outline-none focus:border-purple-500 text-xs">
+            </div>
+            <button onclick="submitTicket()" class="w-full py-4 bg-purple-600 text-white font-bold uppercase rounded-xl hover:bg-purple-500 transition-colors text-xs tracking-widest shadow-[0_0_20px_rgba(147,51,234,0.3)]">
+                <i data-lucide="send" class="w-4 h-4 inline mr-2"></i> Submit Ticket
+            </button>
+        </div>
+
+        <!-- My Tickets List -->
+        <div id="ticket-content-my-tickets" class="hidden p-4 space-y-3">
+            <div id="my-tickets-list" class="space-y-3"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Ticket Chat Modal -->
+<div id="ticket-chat-modal" class="fixed inset-0 z-[250] bg-black/90 backdrop-blur-xl hidden items-center justify-center p-4">
+    <div class="bg-[#0a0a0a] border border-purple-500/30 rounded-3xl w-full max-w-lg h-[80vh] flex flex-col shadow-[0_0_50px_rgba(147,51,234,0.2)]">
+        
+        <!-- Header -->
+        <div class="p-4 border-b border-white/10 flex justify-between items-center bg-purple-900/20 rounded-t-3xl">
+            <div>
+                <p class="text-white font-bold text-sm uppercase tracking-widest" id="chat-ticket-id">TKT-123</p>
+                <p class="text-[10px] text-gray-400 truncate max-w-[200px]" id="chat-ticket-subject">Subject here</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="chat-ticket-status" class="text-[10px] px-2 py-1 rounded font-bold uppercase">Open</span>
+                <button onclick="closeModal('ticket-chat-modal')" class="text-gray-400 hover:text-white p-2"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div id="ticket-messages-container" class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+        </div>
+
+        <!-- Reply Input -->
+        <div id="ticket-reply-box" class="p-4 border-t border-white/10 bg-black/50 rounded-b-3xl">
+            <div class="flex gap-2">
+                <input type="text" id="ticket-reply-input" placeholder="Type your reply..." class="flex-1 bg-black border border-white/20 text-white px-4 py-3 rounded-xl outline-none focus:border-purple-500 text-xs uppercase">
+                <button onclick="sendTicketReply()" class="bg-purple-600 text-white px-4 rounded-xl hover:bg-purple-500 transition-colors">
+                    <i data-lucide="send" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
-</html> 
+</html>  ADD KAR DO AUR FEATURES AUR FULL MODIFICATION KAR KE CODE DO

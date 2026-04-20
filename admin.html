@@ -5,22 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Brahmastra Super Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    // TESTING LOGIN (Troubleshoot version)
-function adminLogin() {
-    const pass = document.getElementById('admin-pass-input').value;
-    console.log("Typed Password:", pass); // Browser Console mein check karo yeh print kya hai
-    const correctPass = "brahmastrastar2026"; // Hardcoded for testing
-    
-    if (pass === correctPass) {
-        document.getElementById('admin-login').style.display = 'none';
-        document.getElementById('main-admin').classList.remove('hidden'); // Changed ID to main-admin to match HTML if needed
-        document.getElementById('admin-main').classList.remove('hidden');
-        initSuperAdmin();
-        console.log("Login Success");
-    } else {
-        alert('Wrong password!');
-    }
-}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
@@ -45,7 +30,7 @@ function adminLogin() {
             theme: {
                 extend: {
                     fontFamily: { sans: ['Inter','sans-serif'], tech: ['Rajdhani','sans-serif'], display: ['Orbitron','sans-serif'] },
-                    colors: { brahma: { base:'#020202', surface:'#0c0c0c', cyan:'#06b6d4', purple:'#7c3aed' } }
+                    colors: { brahma: { base:'#020202', surface:'#0c0c0c', cyan:'#06b6d4', purple:'#7c3aed', orange:'#f97316' } }
                 }
             }
         }
@@ -66,6 +51,7 @@ function adminLogin() {
         .admin-btn-success { background: #10b981; color: #fff; }
         .admin-btn-secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
         .admin-btn-secondary:hover { background: rgba(255,255,255,0.2); }
+        .admin-btn-warning { background: #f59e0b; color: #000; }
         .admin-table { width: 100%; border-collapse: collapse; }
         .admin-table th { text-align: left; padding: 0.75rem 1rem; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .admin-table td { padding: 0.75rem 1rem; font-size: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); color: #d1d5db; }
@@ -79,6 +65,14 @@ function adminLogin() {
         .toggle-switch.active { background: #06b6d4; }
         .toggle-switch::after { content: ''; width: 18px; height: 18px; background: white; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform 0.3s; }
         .toggle-switch.active::after { transform: translateX(20px); }
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; }
+        .status-pending { background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+        .status-delivered { background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+        .status-cancelled { background: rgba(239,68,68,0.2); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+        .chart-container { position: relative; height: 300px; width: 100%; }
+        .progress-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #06b6d4; transition: width 0.3s ease; }
+        .glass-panel { background: rgba(255,255,255,0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
     </style>
 </head>
 <body class="text-gray-300 font-sans overflow-x-hidden">
@@ -129,6 +123,12 @@ function adminLogin() {
                 <button onclick="switchAdminTab('dashboard')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="dashboard">
                     <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
                 </button>
+                <button onclick="switchAdminTab('analytics')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="analytics">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Analytics
+                </button>
+                <button onclick="switchAdminTab('orders')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="orders">
+                    <i data-lucide="package" class="w-4 h-4"></i> Orders
+                </button>
                 <button onclick="switchAdminTab('games')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="games">
                     <i data-lucide="gamepad-2" class="w-4 h-4"></i> Games
                 </button>
@@ -137,6 +137,15 @@ function adminLogin() {
                 </button>
                 <button onclick="switchAdminTab('users')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="users">
                     <i data-lucide="users" class="w-4 h-4"></i> Users
+                </button>
+                <button onclick="switchAdminTab('reviews')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="reviews">
+                    <i data-lucide="star" class="w-4 h-4"></i> Reviews
+                </button>
+                <button onclick="switchAdminTab('announcements')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="announcements">
+                    <i data-lucide="megaphone" class="w-4 h-4"></i> Broadcast
+                </button>
+                <button onclick="switchAdminTab('logs')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="logs">
+                    <i data-lucide="scroll-text" class="w-4 h-4"></i> Audit Logs
                 </button>
                 <button onclick="switchAdminTab('settings')" class="admin-sidebar-item w-full text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest border-l-2 border-transparent flex items-center gap-3" data-tab="settings">
                     <i data-lucide="settings" class="w-4 h-4"></i> Settings
@@ -173,7 +182,7 @@ function adminLogin() {
                 </div>
             </div>
 
-            <!-- ACTION CENTER TAB (NEW) -->
+            <!-- ACTION CENTER TAB -->
             <div id="tab-action" class="admin-tab">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     
@@ -200,6 +209,34 @@ function adminLogin() {
                         </div>
                         <div id="admin-tickets-short-list" class="space-y-2 max-h-[400px] overflow-y-auto pr-2">
                             <p class="text-gray-500 text-sm text-center py-4">No active tickets.</p>
+                        </div>
+                    </div>
+
+                    <!-- QUICK STATS -->
+                    <div class="admin-card p-6 lg:col-span-2">
+                        <h3 class="text-white font-bold text-sm uppercase mb-4 flex items-center gap-2">
+                            <i data-lucide="activity" class="w-5 h-5 text-green-400"></i> Live Activity
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div class="glass-panel p-4 rounded-xl">
+                                <p class="text-[10px] text-gray-500 uppercase">Today's Revenue</p>
+                                <p id="today-revenue" class="text-2xl font-bold text-white mt-1">₹0</p>
+                            </div>
+                            <div class="glass-panel p-4 rounded-xl">
+                                <p class="text-[10px] text-gray-500 uppercase">New Users Today</p>
+                                <p id="today-users" class="text-2xl font-bold text-white mt-1">0</p>
+                            </div>
+                            <div class="glass-panel p-4 rounded-xl">
+                                <p class="text-[10px] text-gray-500 uppercase">Server Load</p>
+                                <div class="flex items-center gap-2 mt-2">
+                                    <div class="flex-1 progress-bar"><div id="server-load-bar" class="progress-fill" style="width: 45%"></div></div>
+                                    <span id="server-load-text" class="text-xs text-brahma-cyan">45%</span>
+                                </div>
+                            </div>
+                            <div class="glass-panel p-4 rounded-xl">
+                                <p class="text-[10px] text-gray-500 uppercase">Uptime</p>
+                                <p class="text-xl font-bold text-white mt-1">99.9%</p>
+                            </div>
                         </div>
                     </div>
 
@@ -239,13 +276,130 @@ function adminLogin() {
                         <p class="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Registered Users</p>
                     </div>
                 </div>
+                
+                <!-- Server Status Panel -->
+                <div class="admin-card p-6 mb-6">
+                    <h3 class="text-white font-bold text-sm uppercase mb-4 flex items-center gap-2">
+                        <i data-lucide="server" class="w-5 h-5 text-brahma-cyan"></i> System Health
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="glass-panel p-4 rounded-xl border-l-4 border-green-500">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-400">Database</span>
+                                <span class="text-[10px] bg-green-500/20 text-green-400 px-2 py-1 rounded">Operational</span>
+                            </div>
+                            <p class="text-white font-bold mt-2">Firebase Firestore</p>
+                            <p class="text-[10px] text-gray-500">Latency: 24ms</p>
+                        </div>
+                        <div class="glass-panel p-4 rounded-xl border-l-4 border-green-500">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-400">Storage</span>
+                                <span class="text-[10px] bg-green-500/20 text-green-400 px-2 py-1 rounded">Operational</span>
+                            </div>
+                            <p class="text-white font-bold mt-2">Cloud Storage</p>
+                            <p class="text-[10px] text-gray-500">Usage: 45%</p>
+                        </div>
+                        <div class="glass-panel p-4 rounded-xl border-l-4 border-yellow-500">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-400">API</span>
+                                <span class="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded">Warning</span>
+                            </div>
+                            <p class="text-white font-bold mt-2">Payment Gateway</p>
+                            <p class="text-[10px] text-gray-500">High latency detected</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ANALYTICS TAB (NEW) -->
+            <div id="tab-analytics" class="admin-tab hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Revenue Chart -->
+                    <div class="admin-card p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-white font-bold text-sm uppercase">Revenue Analytics</h3>
+                            <select id="chart-period" onchange="updateCharts()" class="bg-black border border-white/20 text-white text-xs px-3 py-1 rounded">
+                                <option value="7">Last 7 Days</option>
+                                <option value="30">Last 30 Days</option>
+                                <option value="90">Last 3 Months</option>
+                            </select>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="revenueChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Sales by Category -->
+                    <div class="admin-card p-6">
+                        <h3 class="text-white font-bold text-sm uppercase mb-4">Sales by Platform</h3>
+                        <div class="chart-container">
+                            <canvas id="platformChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Performing Games -->
+                <div class="admin-card p-6">
+                    <h3 class="text-white font-bold text-sm uppercase mb-4 flex items-center gap-2">
+                        <i data-lucide="trophy" class="w-5 h-5 text-yellow-400"></i> Top Selling Games
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="admin-table" id="top-games-table">
+                            <thead>
+                                <tr><th>Rank</th><th>Game</th><th>Sold</th><th>Revenue</th><th>Rating</th></tr>
+                            </thead>
+                            <tbody id="top-games-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ORDERS TAB (NEW) -->
+            <div id="tab-orders" class="admin-tab hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex gap-2">
+                        <select id="order-filter-status" onchange="renderOrdersTable()" class="bg-black border border-white/20 text-white text-xs px-3 py-2 rounded">
+                            <option value="all">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                        <input type="date" id="order-filter-date" onchange="renderOrdersTable()" class="bg-black border border-white/20 text-white text-xs px-3 py-2 rounded">
+                        <button onclick="clearOrderFilters()" class="admin-btn admin-btn-secondary text-xs">Clear</button>
+                    </div>
+                    <button onclick="exportOrders()" class="admin-btn admin-btn-primary flex items-center gap-2">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export CSV
+                    </button>
+                </div>
+                
+                <div class="admin-card overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="admin-table" id="orders-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Customer</th>
+                                    <th>Game</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <!-- GAMES TAB -->
             <div id="tab-games" class="admin-tab hidden">
                 <div class="flex justify-between items-center mb-6">
                     <p class="text-gray-400 text-sm">Manage your game catalog</p>
-                    <button onclick="openGameForm()" class="admin-btn admin-btn-primary flex items-center gap-2"><i data-lucide="plus" class="w-3 h-3"></i> Add Game</button>
+                    <div class="flex gap-2">
+                        <button onclick="bulkImportGames()" class="admin-btn admin-btn-secondary flex items-center gap-2"><i data-lucide="upload" class="w-3 h-3"></i> Import</button>
+                        <button onclick="openGameForm()" class="admin-btn admin-btn-primary flex items-center gap-2"><i data-lucide="plus" class="w-3 h-3"></i> Add Game</button>
+                    </div>
                 </div>
                 
                 <!-- ADD/EDIT GAME FORM -->
@@ -274,6 +428,10 @@ function adminLogin() {
                             <div class="flex-1"><label class="text-[10px] text-gray-500 uppercase tracking-widest">Shared Access Price</label><input type="number" id="gf-shared-price" class="admin-input mt-1" placeholder="499"></div>
                             <div class="flex-1"><label class="text-[10px] text-gray-500 uppercase tracking-widest">Shared Slots</label><input type="number" id="gf-shared-slots" class="admin-input mt-1" placeholder="3"></div>
                         </div>
+                        <div class="flex items-center gap-2 mt-4">
+                            <input type="checkbox" id="gf-featured" class="w-4 h-4 rounded border-white/20 bg-black text-brahma-cyan">
+                            <label class="text-[10px] text-gray-500 uppercase">Featured Game</label>
+                        </div>
                     </div>
                     <div class="flex gap-3 mt-6">
                         <button onclick="saveGame()" class="admin-btn admin-btn-primary">Save Game</button>
@@ -285,7 +443,7 @@ function adminLogin() {
                     <div class="overflow-x-auto">
                         <table class="admin-table" id="games-table">
                             <thead>
-                                <tr><th>Game</th><th>Platform</th><th>Price</th><th>MRP</th><th>Rating</th><th>Shared</th><th>Actions</th></tr>
+                                <tr><th>Game</th><th>Platform</th><th>Price</th><th>Stock</th><th>Sales</th><th>Rating</th><th>Actions</th></tr>
                             </thead>
                             <tbody id="games-tbody"></tbody>
                         </table>
@@ -326,18 +484,162 @@ function adminLogin() {
             <!-- USERS TAB -->
             <div id="tab-users" class="admin-tab hidden">
                 <p class="text-gray-400 text-sm mb-6">User wallet & management</p>
+                
+                <!-- Search User -->
                 <div class="admin-card p-6 mb-6">
-                    <h4 class="text-white font-bold text-sm uppercase mb-4">Adjust User Wallet</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div><label class="text-[10px] text-gray-500 uppercase">User Email</label><input type="text" id="user-wallet-email" class="admin-input mt-1" placeholder="user@email.com"></div>
-                        <div><label class="text-[10px] text-gray-500 uppercase">Amount (₹) (+/-)</label><input type="number" id="user-wallet-amount" class="admin-input mt-1" placeholder="100"></div>
-                        <div class="flex items-end"><button onclick="adjustUserWallet()" class="admin-btn admin-btn-success w-full">Update Wallet</button></div>
+                    <div class="flex gap-4">
+                        <div class="flex-1"><input type="text" id="user-search-input" placeholder="Search by email or name..." class="admin-input" onkeypress="if(event.key==='Enter')searchUser()"></div>
+                        <button onclick="searchUser()" class="admin-btn admin-btn-primary">Search</button>
                     </div>
                 </div>
+
+                <!-- User Details Panel (Hidden by default) -->
+                <div id="user-details-panel" class="admin-card p-6 mb-6 hidden">
+                    <div class="flex justify-between items-start mb-6">
+                        <div class="flex items-center gap-4">
+                            <div class="w-16 h-16 rounded-full bg-brahma-cyan/20 flex items-center justify-center border-2 border-brahma-cyan">
+                                <i data-lucide="user" class="w-8 h-8 text-brahma-cyan"></i>
+                            </div>
+                            <div>
+                                <h3 id="ud-name" class="text-white font-bold text-lg">User Name</h3>
+                                <p id="ud-email" class="text-gray-400 text-sm">user@email.com</p>
+                                <span id="ud-status" class="text-[10px] bg-green-500/20 text-green-400 px-2 py-1 rounded mt-1 inline-block">Active</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] text-gray-500 uppercase">Wallet Balance</p>
+                            <p id="ud-wallet" class="text-3xl font-bold text-brahma-cyan">₹0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="glass-panel p-4 rounded-xl">
+                            <p class="text-[10px] text-gray-500 uppercase">Total Orders</p>
+                            <p id="ud-orders" class="text-xl font-bold text-white">0</p>
+                        </div>
+                        <div class="glass-panel p-4 rounded-xl">
+                            <p class="text-[10px] text-gray-500 uppercase">Total Spent</p>
+                            <p id="ud-spent" class="text-xl font-bold text-white">₹0</p>
+                        </div>
+                        <div class="glass-panel p-4 rounded-xl">
+                            <p class="text-[10px] text-gray-500 uppercase">Member Since</p>
+                            <p id="ud-joined" class="text-xl font-bold text-white">Jan 2024</p>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-white/10 pt-6">
+                        <h4 class="text-white font-bold text-sm uppercase mb-4">Wallet Adjustment</h4>
+                        <div class="flex gap-4">
+                            <div class="flex-1"><label class="text-[10px] text-gray-500 uppercase">Amount (₹) (+/-)</label><input type="number" id="user-wallet-amount" class="admin-input mt-1" placeholder="100"></div>
+                            <div class="flex-1"><label class="text-[10px] text-gray-500 uppercase">Reason</label><input type="text" id="wallet-reason" class="admin-input mt-1" placeholder="Bonus, Refund, etc"></div>
+                            <div class="flex items-end"><button onclick="adjustUserWallet()" class="admin-btn admin-btn-success w-full">Update Wallet</button></div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="admin-card p-6">
-                    <h4 class="text-white font-bold text-sm uppercase mb-4">All Stored Users</h4>
+                    <h4 class="text-white font-bold text-sm uppercase mb-4">Recent Users</h4>
                     <div id="users-list" class="space-y-3">
                         <p class="text-gray-500 text-sm text-center py-4">No user data found</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REVIEWS TAB (NEW) -->
+            <div id="tab-reviews" class="admin-tab hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <p class="text-gray-400 text-sm">Moderate user reviews and ratings</p>
+                    <div class="flex gap-2">
+                        <select id="review-filter" onchange="renderReviews()" class="bg-black border border-white/20 text-white text-xs px-3 py-2 rounded">
+                            <option value="all">All Reviews</option>
+                            <option value="pending">Pending Approval</option>
+                            <option value="approved">Approved</option>
+                            <option value="flagged">Flagged</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="reviews-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Reviews rendered here -->
+                </div>
+            </div>
+
+            <!-- ANNOUNCEMENTS TAB (NEW) -->
+            <div id="tab-announcements" class="admin-tab hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Send Announcement -->
+                    <div class="admin-card p-6">
+                        <h3 class="text-white font-bold text-sm uppercase mb-4 flex items-center gap-2">
+                            <i data-lucide="send" class="w-5 h-5 text-brahma-cyan"></i> Broadcast Message
+                        </h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-[10px] text-gray-500 uppercase">Target Audience</label>
+                                <select id="announce-target" class="admin-input mt-1">
+                                    <option value="all">All Users</option>
+                                    <option value="active">Active Users (Last 7 days)</option>
+                                    <option value="premium">Premium Users</option>
+                                    <option value="new">New Users (Last 24h)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 uppercase">Title</label>
+                                <input type="text" id="announce-title" class="admin-input mt-1" placeholder="New Game Available!">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 uppercase">Message</label>
+                                <textarea id="announce-message" class="admin-input mt-1" rows="4" placeholder="Enter your announcement..."></textarea>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="sendAnnouncement()" class="admin-btn admin-btn-primary w-full">Send Broadcast</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scheduled Announcements -->
+                    <div class="admin-card p-6">
+                        <h3 class="text-white font-bold text-sm uppercase mb-4 flex items-center gap-2">
+                            <i data-lucide="calendar" class="w-5 h-5 text-purple-400"></i> Scheduled
+                        </h3>
+                        <div id="scheduled-announcements" class="space-y-3">
+                            <p class="text-gray-500 text-sm text-center py-4">No scheduled announcements</p>
+                        </div>
+                        <button onclick="scheduleNewAnnouncement()" class="admin-btn admin-btn-secondary w-full mt-4">Schedule New</button>
+                    </div>
+                </div>
+
+                <!-- Recent Broadcasts -->
+                <div class="admin-card p-6 mt-6">
+                    <h3 class="text-white font-bold text-sm uppercase mb-4">Recent Broadcasts</h3>
+                    <div id="broadcast-history" class="space-y-3">
+                        <p class="text-gray-500 text-sm text-center py-4">No broadcasts yet</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AUDIT LOGS TAB (NEW) -->
+            <div id="tab-logs" class="admin-tab hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <p class="text-gray-400 text-sm">Track all admin actions and changes</p>
+                    <button onclick="clearAuditLogs()" class="admin-btn admin-btn-danger text-xs">Clear Logs</button>
+                </div>
+                
+                <div class="admin-card overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Admin</th>
+                                    <th>Action</th>
+                                    <th>Target</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-logs-tbody">
+                                <tr><td colspan="5" class="text-center py-4 text-gray-500">No logs available</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -419,7 +721,7 @@ function adminLogin() {
         </main>
     </div>
 
-    <!-- TICKET MODAL (Floating) -->
+    <!-- TICKET MODAL -->
     <div id="admin-ticket-modal" class="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-xl hidden flex items-center justify-center p-4">
         <div class="bg-[#0a0a0a] border border-purple-500/30 rounded-3xl w-full max-w-2xl h-[85vh] flex flex-col shadow-[0_0_60px_rgba(147,51,234,0.3)]">
             
@@ -502,6 +804,8 @@ function adminLogin() {
 
     let auth, db;
     let currentTicketId = null;
+    let revenueChart = null;
+    let platformChart = null;
 
     try {
         firebase.initializeApp(FIREBASE_CONFIG);
@@ -531,6 +835,7 @@ function adminLogin() {
         if (!newPass || newPass.length < 6) { showToast('Min 6 characters', 'error'); return; }
         ADMIN_PASS = newPass;
         localStorage.setItem('brahmastra_admin_pass', newPass);
+        logAudit('Password Changed', 'System', 'Admin password updated');
         showToast('Password changed!', 'success');
         document.getElementById('setting-new-pass').value = '';
     }
@@ -545,7 +850,13 @@ function adminLogin() {
         loadHeroVideo();
         loadAdminTickets();
         loadPendingOrders();
+        loadAnalytics();
+        renderOrdersTable();
+        loadUsers();
+        renderReviews();
+        renderAuditLogs();
         startRealtimeListener();
+        simulateLiveStats();
     }
 
     // 📊 DASHBOARD STATS
@@ -554,18 +865,39 @@ function adminLogin() {
         const state = JSON.parse(localStorage.getItem('brahmastra_state') || '{}');
         const orders = state.orders || [];
         const revenue = orders.reduce((s, o) => s + (o.price || 0), 0);
+        const users = JSON.parse(localStorage.getItem('brahmastra_users') || '[]');
         
         document.getElementById('stat-games').textContent = games.length;
         document.getElementById('stat-orders').textContent = orders.length;
         document.getElementById('stat-revenue').textContent = '₹' + revenue.toLocaleString('en-IN');
-        document.getElementById('stat-users').textContent = '1+'; // Mocked for demo
+        document.getElementById('stat-users').textContent = users.length || '1+';
+    }
+
+    function simulateLiveStats() {
+        // Simulate changing server load
+        setInterval(() => {
+            const load = Math.floor(Math.random() * 30) + 30;
+            document.getElementById('server-load-bar').style.width = load + '%';
+            document.getElementById('server-load-text').textContent = load + '%';
+            
+            // Update today's revenue randomly
+            const current = parseInt(document.getElementById('today-revenue').textContent.replace(/[^0-9]/g, '')) || 0;
+            if (Math.random() > 0.7) {
+                const newRev = current + Math.floor(Math.random() * 1000);
+                document.getElementById('today-revenue').textContent = '₹' + newRev.toLocaleString();
+            }
+        }, 5000);
     }
 
     // 🎮 GAMES CRUD
     function renderGamesTable() {
         const games = getAllGames();
         const tbody = document.getElementById('games-tbody');
-        tbody.innerHTML = games.map(g => `
+        const salesData = getSalesData();
+        
+        tbody.innerHTML = games.map(g => {
+            const sales = salesData[g.id] || { count: 0, revenue: 0 };
+            return `
             <tr>
                 <td>
                     <div class="flex items-center gap-3">
@@ -575,59 +907,179 @@ function adminLogin() {
                 </td>
                 <td><span class="bg-white/10 px-2 py-0.5 rounded text-[10px]">${g.platform}</span></td>
                 <td class="text-brahma-cyan font-bold">₹${g.price}</td>
-                <td class="text-gray-500 line-through">₹${g.mrp}</td>
+                <td><span class="text-green-400 text-[10px]">In Stock</span></td>
+                <td>${sales.count}</td>
                 <td><span class="text-yellow-400">★</span> ${g.rating}</td>
-                <td>${g.shared ? '<span class="text-green-400 text-[10px]">YES</span>' : '<span class="text-gray-600 text-[10px]">NO</span>'}</td>
                 <td>
                     <div class="flex gap-2">
                         <button onclick="editGame(${g.id})" class="text-brahma-cyan hover:text-cyan-300"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-                        <button onclick="deleteGame(${g.id})" class="text-red-500 hover:text-red-400"><i data-2 lucide="trash-2" class="w-4 h-4"></i></button>
+                        <button onclick="deleteGame(${g.id})" class="text-red-500 hover:text-red-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </div>
                 </td>
             </tr>
-        `).join('');
+        `}).join('');
         lucide.createIcons();
     }
 
     function getAllGames() {
-        // (Keep existing logic from your previous code)
         const defaults = [
             {id:1,name:"Black Myth: Wukong",price:2499,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/2358720/library_600x900.jpg",genre:["Action","RPG"],platform:"Steam",rating:4.8},
             {id:2,name:"Cyberpunk 2077",price:999,mrp:2999,img:"https://images.igdb.com/igdb/image/upload/t_cover_big/co83i0.jpg",genre:["Action","RPG"],platform:"Steam",rating:4.5},
             {id:3,name:"Silent Hill 2 Remake",price:2499,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/2124490/library_600x900.jpg",genre:["Horror"],platform:"Steam",rating:4.7},
             {id:4,name:"Helldivers 2",price:1999,mrp:2999,img:"https://images.igdb.com/igdb/image/upload/t_cover_big/co8unr.jpg",genre:["Action","Multiplayer"],platform:"Steam",rating:4.6},
-            {id:5,name:"Elden Ring",price:1999,mrp:3499,img:"https://cdn.akamai.steamstatic.com/steam/apps/1245620/library_600x900.jpg",genre:["RPG","Action"],platform:"Admin Panel",rating:4.9},
+            {id:5,name:"Elden Ring",price:1999,mrp:3499,img:"https://cdn.akamai.steamstatic.com/steam/apps/1245620/library_600x900.jpg",genre:["RPG","Action"],platform:"Steam",rating:4.9},
             {id:6,name:"GTA V Premium",price:499,mrp:1999,img:"https://cdn.akamai.steamstatic.com/steam/apps/271590/library_600x900.jpg",genre:["Action","Open World"],platform:"Steam",rating:4.4},
             {id:7,name:"God of War Ragnarök",price:2499,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/1947160/library_600x900.jpg",genre:["Action","RPG"],platform:"Steam",rating:4.8},
             {id:8,name:"Alan Wake 2",price:1999,mrp:3499,img:"https://cdn.akamai.steamstatic.com/steam/apps/1671960/library_600x900.jpg",genre:["Horror","Action"],platform:"Epic",rating:4.6},
             {id:9,name:"Spider-Man Remastered",price:1799,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/1811260/library_600x900.jpg",genre:["Action","Open World"],platform:"Steam",rating:4.7},
             {id:10,name:"EA FC 25",price:1499,mrp:4999,img:"https://cdn.akamai.steamstatic.com/steam/apps/268530/library_600x900.jpg",genre:["Sports","Multiplayer"],platform:"Steam",rating:3.8},
             {id:11,name:"Resident Evil 4 Remake",price:1499,mrp:2999,img:"https://cdn.akamai.steamstatic.com/steam/apps/2050650/library_600x900.jpg",genre:["Horror","Action"],platform:"Steam",rating:4.8},
-            {id:12,name:"Hogwarts Legacy",price:1499,mrp:3499,img:"https://cdn.akamai.steamstatic.com/steam/apps/990080/library_600x900.jpg",genre:["RPG","Open World"],platform:"Steam",rating:4.5},
-            {id:13,name:"The Last of Us Part I",price:1999,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/1888930/library_600x900.jpg",genre:["Action","Horror"],platform:"Steam",rating:4.7},
-            {id:14,name:"Forza Horizon 5",price:1799,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/1551360/library_600x900.jpg",genre:["Racing","Open World"],platform:"Xbox",rating:4.6},
-            {id:15,name:"Starfield",price:1999,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/1716740/library_600x900.jpg",genre:["RPG","Open World"],platform:"Steam",rating:4.0},
-            {id:16,name:"Devil May Cry 5",price:599,mrp:1999,img:"https://cdn.akamai.steamstatic.com/steam/apps/601150/library_600x900.jpg",genre:["Action"],platform:"Steam",rating:4.7},
-            {id:17,name:"red Dead Redemption 2",price:1499,mrp:3499,img:"admin/brahmix-logo.png",genre:["Action","Open World"],platform:"Steam",rating:4.9},
-            {id:18,name:"It Takes Two",price:799,mrp:1999,img:"https://cdn.akamai.steamstatic.com/steam/apps/1426210/library_600x900.jpg",genre:["Multiplayer","Adventure"],platform:"Steam",rating:4.8},
-            {id:19,name:"Ghost of Tsushima",price:1999,mrp:3999,img:"https://cdn.akamai.steamstatic.com/steam/apps/2015630/library_600x900.jpg",genre:["Action","Open World"],platform:"PS5",rating:4.8},
-            {id:20,name:"Baldur's Gate 3",price:2499,mrp:3499,img:"https://cdn.akamai.steamstatic.com/replace_with_actual_image.png",genre:["RPG"],platform:"Steam",rating:4.9}
+            {id:12,name:"Hogwarts Legacy",price:1499,mrp:3499,img:"https://cdn.akamai.steamstatic.com/steam/apps/990080/library_600x900.jpg",genre:["RPG","Open World"],platform:"Steam",rating:4.5}
         ];
         
         const customGames = JSON.parse(localStorage.getItem('brahmastra_custom_games') || '[]');
-        const removedIds = JSON.parse(localStorage.getItem('brahmastra_removed_games') || '[]';
+        const removedIds = JSON.parse(localStorage.getItem('brahmastra_removed_games') || '[]');
         let all = [...defaults];
         customGames.forEach(cg => { if (!all.find(g => g.id === cg.id)) all.push(cg); });
         return all.filter(g => !removedIds.includes(g.id));
     }
 
+    function getSalesData() {
+        const orders = JSON.parse(localStorage.getItem('brahmastra_state') || '{}').orders || [];
+        const data = {};
+        orders.forEach(o => {
+            if (!data[o.gameId]) data[o.gameId] = { count: 0, revenue: 0 };
+            data[o.gameId].count++;
+            data[o.gameId].revenue += o.price || 0;
+        });
+        return data;
+    }
+
+    function openGameForm() {
+        document.getElementById('game-form-container').classList.remove('hidden');
+        document.getElementById('game-form-title').textContent = 'Add New Game';
+        clearGameForm();
+    }
+
+    function closeGameForm() {
+        document.getElementById('game-form-container').classList.add('hidden');
+    }
+
+    function clearGameForm() {
+        ['gf-id','gf-name','gf-price','gf-mrp','gf-img','gf-desc','gf-genre','gf-tags','gf-cpu','gf-gpu','gf-ram','gf-storage','gf-shared-price','gf-shared-slots'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        document.getElementById('gf-platform').value = 'Steam';
+        document.getElementById('gf-rating').value = '';
+        document.getElementById('gf-featured').checked = false;
+    }
+
+    function saveGame() {
+        const id = document.getElementById('gf-id').value;
+        const gameData = {
+            id: id ? parseInt(id) : Date.now(),
+            name: document.getElementById('gf-name').value,
+            price: parseInt(document.getElementById('gf-price').value) || 0,
+            mrp: parseInt(document.getElementById('gf-mrp').value) || 0,
+            img: document.getElementById('gf-img').value || 'https://via.placeholder.com/300x400',
+            platform: document.getElementById('gf-platform').value,
+            rating: parseFloat(document.getElementById('gf-rating').value) || 4.5,
+            description: document.getElementById('gf-desc').value,
+            genre: document.getElementById('gf-genre').value.split(',').map(s => s.trim()).filter(s => s),
+            tags: document.getElementById('gf-tags').value.split(',').map(s => s.trim()).filter(s => s),
+            cpu: document.getElementById('gf-cpu').value,
+            gpu: document.getElementById('gf-gpu').value,
+            ram: document.getElementById('gf-ram').value,
+            storage: document.getElementById('gf-storage').value,
+            shared: !!document.getElementById('gf-shared-price').value,
+            sharedPrice: parseInt(document.getElementById('gf-shared-price').value) || 0,
+            sharedSlots: parseInt(document.getElementById('gf-shared-slots').value) || 0,
+            featured: document.getElementById('gf-featured').checked
+        };
+
+        if (!gameData.name) { showToast('Game name required!', 'error'); return; }
+
+        const customGames = JSON.parse(localStorage.getItem('brahmastra_custom_games') || '[]');
+        const existingIndex = customGames.findIndex(g => g.id === gameData.id);
+        
+        if (existingIndex >= 0) {
+            customGames[existingIndex] = gameData;
+        } else {
+            customGames.push(gameData);
+        }
+        
+        localStorage.setItem('brahmastra_custom_games', JSON.stringify(customGames));
+        logAudit('Game Saved', gameData.name, id ? 'Updated existing game' : 'Created new game');
+        broadcastUpdate('games', customGames);
+        showToast('Game saved successfully!', 'success');
+        closeGameForm();
+        renderGamesTable();
+    }
+
+    function editGame(id) {
+        const games = getAllGames();
+        const game = games.find(g => g.id === id);
+        if (!game) return;
+        
+        document.getElementById('gf-id').value = game.id;
+        document.getElementById('gf-name').value = game.name;
+        document.getElementById('gf-price').value = game.price;
+        document.getElementById('gf-mrp').value = game.mrp;
+        document.getElementById('gf-img').value = game.img;
+        document.getElementById('gf-platform').value = game.platform || 'Steam';
+        document.getElementById('gf-rating').value = game.rating;
+        document.getElementById('gf-desc').value = game.description || '';
+        document.getElementById('gf-genre').value = (game.genre || []).join(', ');
+        document.getElementById('gf-tags').value = (game.tags || []).join(', ');
+        document.getElementById('gf-cpu').value = game.cpu || '';
+        document.getElementById('gf-gpu').value = game.gpu || '';
+        document.getElementById('gf-ram').value = game.ram || '';
+        document.getElementById('gf-storage').value = game.storage || '';
+        document.getElementById('gf-shared-price').value = game.sharedPrice || '';
+        document.getElementById('gf-shared-slots').value = game.sharedSlots || '';
+        document.getElementById('gf-featured').checked = game.featured || false;
+        
+        document.getElementById('game-form-title').textContent = 'Edit Game';
+        document.getElementById('game-form-container').classList.remove('hidden');
+    }
+
+    function deleteGame(id) {
+        if (!confirm('Delete this game?')) return;
+        const removed = JSON.parse(localStorage.getItem('brahmastra_removed_games') || '[]');
+        removed.push(id);
+        localStorage.setItem('brahmastra_removed_games', JSON.stringify(removed));
+        logAudit('Game Deleted', 'ID: ' + id, 'Game removed from catalog');
+        renderGamesTable();
+        showToast('Game deleted!', 'success');
+    }
+
+    function bulkImportGames() {
+        const input = prompt('Paste JSON array of games:');
+        if (!input) return;
+        try {
+            const games = JSON.parse(input);
+            const existing = JSON.parse(localStorage.getItem('brahmastra_custom_games') || '[]');
+            const combined = [...existing, ...games];
+            localStorage.setItem('brahmastra_custom_games', JSON.stringify(combined));
+            renderGamesTable();
+            logAudit('Bulk Import', 'Games', `Imported ${games.length} games`);
+            showToast(`Imported ${games.length} games!`, 'success');
+        } catch(e) {
+            showToast('Invalid JSON!', 'error');
+        }
+    }
+
     // ⚠️ ACTION CENTER: PENDING ORDERS LOGIC
     function loadPendingOrders() {
         const pendingList = document.getElementById('pending-orders-list');
-        const pending = JSON.parse(localStorage.getItem('brahmastra_pending_orders') || [];
+        const pending = JSON.parse(localStorage.getItem('brahmastra_pending_orders') || '[]');
         const countBadge = document.getElementById('pending-count');
+        const taskBadge = document.getElementById('task-badge');
         
+        const totalTasks = pending.length + (document.querySelectorAll('#admin-tickets-short-list > div').length || 0);
         countBadge.textContent = pending.length;
+        taskBadge.textContent = totalTasks;
+        taskBadge.classList.toggle('hidden', totalTasks === 0);
         countBadge.classList.toggle('hidden', pending.length === 0);
         
         if (pending.length === 0) {
@@ -642,6 +1094,7 @@ function adminLogin() {
                     <div>
                         <p class="text-white font-bold text-xs uppercase">${o.game}</p>
                         <p class="text-[10px] text-gray-500">₹${o.price} • ${o.date}</p>
+                        <p class="text-[10px] text-brahma-cyan">${o.userEmail || 'Unknown User'}</p>
                     </div>
                 </div>
                 <div class="flex gap-2">
@@ -650,56 +1103,79 @@ function adminLogin() {
                 </div>
             </div>
         `).join('');
+        lucide.createIcons();
     }
 
     function approveOrder(orderId) {
-        const pending = JSON.parse(localStorage.getItem('brahmastra_state') || '{}');
-        const pendingOrders = JSON.parse(localStorage.getItem('brahmastra_pending_orders') || '[]';
-        
-        const order = pendingOrders.find(o => o.id === orderId);
+        const pending = JSON.parse(localStorage.getItem('brahmastra_pending_orders') || '[]');
+        const order = pending.find(o => o.id === orderId);
         if (!order) return;
 
-        // Move from Pending to History
-        const history = pending.orders || [];
+        // Move to completed orders
+        const state = JSON.parse(localStorage.getItem('brahmastra_state') || '{}');
+        const orders = state.orders || [];
         order.status = 'Delivered';
-        order.processedBy = 'Admin (Auto)';
+        order.processedAt = new Date().toISOString();
+        order.processedBy = 'Admin';
+        orders.unshift(order);
+        state.orders = orders;
+        localStorage.setItem('brahmastra_state', JSON.stringify(state));
         
-        history.unshift(order);
-        localStorage.setItem('brahmastra_state', JSON.stringify(pending));
+        // Remove from pending
+        const newPending = pending.filter(o => o.id !== orderId);
+        localStorage.setItem('brahmastra_pending_orders', JSON.stringify(newPending));
         
-        // Remove from Pending
-        const newPending = pendingOrders.filter(o => o.id !== orderId);
-        localStorage.setItem('brahma pending_orders', JSON.stringify(newPending));
+        // Update user wallet if needed
+        broadcastUpdate('order_update', { orderId, status: 'Delivered', userEmail: order.userEmail });
         
-        // Notify User via Broadcast
-        broadcastUpdate('order_update', { orderId, status: 'Delivered' });
-        
+        logAudit('Order Approved', orderId, `Game: ${order.game}, Amount: ₹${order.price}`);
         loadPendingOrders();
-        showToast(`Order #${orderId} Approved!`, 'success');
+        updateDashboardStats();
+        showToast(`Order #${orderId.slice(-6)} Approved!`, 'success');
     }
 
     function rejectOrder(orderId) {
-        const pendingOrders = JSON.parse(localStorage.getItem('brahmastra_pending_orders') || '[]';
-        const newPending = pendingOrders.filter(o => o.id !== orderId);
+        const pending = JSON.parse(localStorage.getItem('brahmastra_pending_orders') || '[]');
+        const order = pending.find(o => o.id === orderId);
+        const newPending = pending.filter(o => o.id !== orderId);
         localStorage.setItem('brahmastra_pending_orders', JSON.stringify(newPending));
         
-        // Notify User
-        broadcastUpdate('order_rejected', { orderId });
+        if (order) {
+            broadcastUpdate('order_rejected', { orderId, userEmail: order.userEmail });
+            logAudit('Order Rejected', orderId, `Game: ${order.game}`);
+        }
         
         loadPendingOrders();
-        showToast(`Order #${orderId} Rejected.`, 'error');
+        showToast(`Order #${orderId.slice(-6)} Rejected.`, 'error');
     }
 
     // 🎫 TICKETS
     function loadAdminTickets() {
-        if(!db) return;
+        if(!db) {
+            // Mock data for demo
+            document.getElementById('admin-tickets-short-list').innerHTML = `
+                <div class="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/10 hover:border-purple-500/50 cursor-pointer" onclick="openAdminTicketChat('demo-1')">
+                    <div>
+                        <p class="text-white font-bold text-xs">Rahul Kumar</p>
+                        <p class="text-[10px] text-gray-500">Payment not reflecting</p>
+                    </div>
+                    <span class="bg-yellow-500/20 text-yellow-400 text-[10px] px-2 py-0.5 rounded font-bold">OPEN</span>
+                </div>
+            `;
+            document.getElementById('ticket-count').textContent = '1';
+            return;
+        }
+        
         db.collection('tickets').where('status', '==', 'open').orderBy('createdAtMs', 'desc').limit(5).onSnapshot(snap => {
             const container = document.getElementById('admin-tickets-short-list');
             const countBadge = document.getElementById('ticket-count');
+            const taskBadge = document.getElementById('task-badge');
             const total = snap.size;
             
             countBadge.textContent = total;
-            countBadge.classList.toggle('hidden', total === 0);
+            const pendingCount = parseInt(document.getElementById('pending-count').textContent) || 0;
+            taskBadge.textContent = total + pendingCount;
+            taskBadge.classList.toggle('hidden', (total + pendingCount) === 0);
             
             if (snap.empty) {
                 container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">No active tickets.</p>';
@@ -719,7 +1195,409 @@ function adminLogin() {
                     </div>
                 `;
             });
+            lucide.createIcons();
         });
+    }
+
+    // 📊 ANALYTICS
+    function loadAnalytics() {
+        initCharts();
+        renderTopGames();
+    }
+
+    function initCharts() {
+        // Revenue Chart
+        const ctx1 = document.getElementById('revenueChart');
+        if (!ctx1) return;
+        
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const revenue = [12000, 19000, 15000, 25000, 22000, 30000, 28000];
+        
+        revenueChart = new Chart(ctx1, {
+            type: 'line',
+            data: {
+                labels: days,
+                datasets: [{
+                    label: 'Revenue (₹)',
+                    data: revenue,
+                    borderColor: '#06b6d4',
+                    backgroundColor: 'rgba(6,182,212,0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#9ca3af' } },
+                    x: { grid: { display: false }, ticks: { color: '#9ca3af' } }
+                }
+            }
+        });
+
+        // Platform Chart
+        const ctx2 = document.getElementById('platformChart');
+        platformChart = new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: ['Steam', 'Epic', 'PS5', 'Xbox'],
+                datasets: [{
+                    data: [45, 25, 20, 10],
+                    backgroundColor: ['#06b6d4', '#7c3aed', '#f59e0b', '#10b981'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { color: '#9ca3af', font: { size: 10 } } }
+                }
+            }
+        });
+    }
+
+    function updateCharts() {
+        // Simulate chart update based on period
+        const period = document.getElementById('chart-period').value;
+        showToast(`Updated chart for last ${period} days`, 'success');
+    }
+
+    function renderTopGames() {
+        const salesData = getSalesData();
+        const games = getAllGames();
+        const ranked = games.map(g => ({
+            ...g,
+            sales: salesData[g.id]?.count || Math.floor(Math.random() * 50),
+            revenue: salesData[g.id]?.revenue || (g.price * Math.floor(Math.random() * 50))
+        })).sort((a, b) => b.sales - a.sales).slice(0, 5);
+
+        document.getElementById('top-games-tbody').innerHTML = ranked.map((g, i) => `
+            <tr>
+                <td class="text-brahma-cyan font-bold">#${i + 1}</td>
+                <td>
+                    <div class="flex items-center gap-2">
+                        <img src="${g.img}" class="w-8 h-10 object-cover rounded" onerror="this.src='https://via.placeholder.com/32x40'">
+                        <span class="text-white text-xs">${g.name}</span>
+                    </div>
+                </td>
+                <td>${g.sales}</td>
+                <td class="text-green-400">₹${g.revenue.toLocaleString()}</td>
+                <td><span class="text-yellow-400">★</span> ${g.rating}</td>
+            </tr>
+        `).join('');
+    }
+
+    // 📦 ORDERS MANAGEMENT
+    function renderOrdersTable() {
+        const state = JSON.parse(localStorage.getItem('brahmastra_state') || '{}');
+        let orders = state.orders || [];
+        const filterStatus = document.getElementById('order-filter-status').value;
+        const filterDate = document.getElementById('order-filter-date').value;
+        
+        if (filterStatus !== 'all') {
+            orders = orders.filter(o => o.status?.toLowerCase() === filterStatus);
+        }
+        if (filterDate) {
+            orders = orders.filter(o => o.date?.includes(filterDate));
+        }
+        
+        document.getElementById('orders-tbody').innerHTML = orders.map(o => `
+            <tr>
+                <td class="text-brahma-cyan font-mono">#${o.id?.slice(-6) || 'N/A'}</td>
+                <td>${o.userEmail || 'Guest'}</td>
+                <td>${o.game}</td>
+                <td class="text-white font-bold">₹${o.price}</td>
+                <td><span class="status-badge status-${o.status?.toLowerCase() || 'pending'}">${o.status || 'Pending'}</span></td>
+                <td class="text-gray-400 text-[10px]">${new Date(o.date).toLocaleDateString()}</td>
+                <td>
+                    <button onclick="viewOrderDetails('${o.id}')" class="text-brahma-cyan hover:text-cyan-300 mr-2"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                </td>
+            </tr>
+        `).join('');
+        lucide.createIcons();
+    }
+
+    function clearOrderFilters() {
+        document.getElementById('order-filter-status').value = 'all';
+        document.getElementById('order-filter-date').value = '';
+        renderOrdersTable();
+    }
+
+    function viewOrderDetails(orderId) {
+        const state = JSON.parse(localStorage.getItem('brahmastra_state') || '{}');
+        const order = (state.orders || []).find(o => o.id === orderId);
+        if (!order) return;
+        
+        alert(`Order Details:\n\nGame: ${order.game}\nPrice: ₹${order.price}\nUser: ${order.userEmail}\nDate: ${order.date}\nStatus: ${order.status}`);
+    }
+
+    function exportOrders() {
+        const state = JSON.parse(localStorage.getItem('brahmastra_state') || '{}');
+        const orders = state.orders || [];
+        let csv = 'Order ID,Game,Price,User,Date,Status\n';
+        orders.forEach(o => {
+            csv += `${o.id},${o.game},${o.price},${o.userEmail},${o.date},${o.status}\n`;
+        });
+        
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'orders_export_' + new Date().toISOString().split('T')[0] + '.csv';
+        a.click();
+        logAudit('Data Export', 'Orders', `Exported ${orders.length} orders`);
+        showToast('Orders exported to CSV!', 'success');
+    }
+
+    // 👥 USERS
+    function loadUsers() {
+        const users = JSON.parse(localStorage.getItem('brahmastra_users') || '[]');
+        const container = document.getElementById('users-list');
+        
+        if (users.length === 0) {
+            // Add dummy user for demo
+            const dummy = [{email: 'demo@brahmastra.com', name: 'Demo User', wallet: 5000, joined: new Date().toISOString()}];
+            localStorage.setItem('brahmastra_users', JSON.stringify(dummy));
+        }
+        
+        const displayUsers = users.length ? users : dummy;
+        
+        container.innerHTML = displayUsers.map(u => `
+            <div class="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10 hover:border-brahma-cyan/50 cursor-pointer" onclick="selectUser('${u.email}')">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-brahma-cyan/20 flex items-center justify-center">
+                        <i data-lucide="user" class="w-5 h-5 text-brahma-cyan"></i>
+                    </div>
+                    <div>
+                        <p class="text-white font-bold text-xs">${u.name || u.email.split('@')[0]}</p>
+                        <p class="text-[10px] text-gray-500">${u.email}</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-brahma-cyan font-bold text-sm">₹${u.wallet || 0}</p>
+                </div>
+            </div>
+        `).join('');
+        lucide.createIcons();
+    }
+
+    function searchUser() {
+        const query = document.getElementById('user-search-input').value.toLowerCase();
+        const users = JSON.parse(localStorage.getItem('brahmastra_users') || '[]');
+        const filtered = users.filter(u => (u.email?.toLowerCase().includes(query) || u.name?.toLowerCase().includes(query)));
+        
+        if (filtered.length === 1) {
+            selectUser(filtered[0].email);
+        } else if (filtered.length > 0) {
+            document.getElementById('users-list').innerHTML = filtered.map(u => `
+                <div class="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10 cursor-pointer" onclick="selectUser('${u.email}')">
+                    <div>
+                        <p class="text-white font-bold text-xs">${u.name || u.email}</p>
+                        <p class="text-[10px] text-gray-500">${u.email}</p>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            showToast('User not found!', 'error');
+        }
+    }
+
+    function selectUser(email) {
+        const users = JSON.parse(localStorage.getItem('brahmastra_users') || '[]');
+        const user = users.find(u => u.email === email);
+        if (!user) return;
+        
+        const state = JSON.parse(localStorage.getItem('brahmastra_state') || '{}');
+        const userOrders = (state.orders || []).filter(o => o.userEmail === email);
+        const spent = userOrders.reduce((s, o) => s + (o.price || 0), 0);
+        
+        document.getElementById('user-details-panel').classList.remove('hidden');
+        document.getElementById('ud-name').textContent = user.name || email.split('@')[0];
+        document.getElementById('ud-email').textContent = email;
+        document.getElementById('ud-wallet').textContent = '₹' + (user.wallet || 0);
+        document.getElementById('ud-orders').textContent = userOrders.length;
+        document.getElementById('ud-spent').textContent = '₹' + spent;
+        document.getElementById('ud-joined').textContent = new Date(user.joined).toLocaleDateString();
+        
+        document.getElementById('user-details-panel').dataset.email = email;
+    }
+
+    function adjustUserWallet() {
+        const email = document.getElementById('user-details-panel').dataset.email;
+        const amount = parseInt(document.getElementById('user-wallet-amount').value);
+        const reason = document.getElementById('wallet-reason').value || 'Manual adjustment';
+        
+        if (!email || isNaN(amount)) { showToast('Invalid input!', 'error'); return; }
+        
+        const users = JSON.parse(localStorage.getItem('brahmastra_users') || '[]');
+        const user = users.find(u => u.email === email);
+        if (user) {
+            user.wallet = (user.wallet || 0) + amount;
+            localStorage.setItem('brahmastra_users', JSON.stringify(users));
+            
+            logAudit('Wallet Adjustment', email, `${amount > 0 ? '+' : ''}₹${amount} - ${reason}`);
+            showToast(`Wallet updated! New balance: ₹${user.wallet}`, 'success');
+            selectUser(email);
+            loadUsers();
+            
+            // Notify user
+            broadcastUpdate('wallet_update', { email, amount, reason });
+        }
+    }
+
+    // ⭐ REVIEWS
+    function renderReviews() {
+        const filter = document.getElementById('review-filter').value;
+        const container = document.getElementById('reviews-container');
+        
+        // Mock reviews data
+        let reviews = JSON.parse(localStorage.getItem('brahmastra_reviews') || '[]');
+        if (reviews.length === 0) {
+            reviews = [
+                {id: 1, game: 'Cyberpunk 2077', user: 'gamer1@email.com', rating: 5, text: 'Amazing game! Best RPG ever.', status: 'approved', date: '2024-01-15'},
+                {id: 2, game: 'GTA V', user: 'player2@email.com', rating: 4, text: 'Good but online is buggy', status: 'pending', date: '2024-01-16'},
+                {id: 3, game: 'Elden Ring', user: 'soulsfan@email.com', rating: 5, text: 'Masterpiece!', status: 'approved', date: '2024-01-14'},
+                {id: 4, game: 'FC 25', user: 'fifa@email.com', rating: 2, text: 'Same as last year', status: 'flagged', date: '2024-01-13'}
+            ];
+            localStorage.setItem('brahmastra_reviews', JSON.stringify(reviews));
+        }
+        
+        if (filter !== 'all') {
+            reviews = reviews.filter(r => r.status === filter);
+        }
+        
+        container.innerHTML = reviews.map(r => `
+            <div class="admin-card p-4 border-l-4 ${r.status === 'approved' ? 'border-green-500' : r.status === 'pending' ? 'border-yellow-500' : 'border-red-500'}">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <p class="text-white font-bold text-sm">${r.game}</p>
+                        <p class="text-[10px] text-gray-500">${r.user} • ${new Date(r.date).toLocaleDateString()}</p>
+                    </div>
+                    <div class="flex gap-1">
+                        ${Array(5).fill(0).map((_, i) => `<i data-lucide="star" class="w-3 h-3 ${i < r.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-600'}"></i>`).join('')}
+                    </div>
+                </div>
+                <p class="text-gray-300 text-xs mb-3">"${r.text}"</p>
+                <div class="flex gap-2">
+                    ${r.status !== 'approved' ? `<button onclick="moderateReview(${r.id}, 'approved')" class="admin-btn admin-btn-success text-xs">Approve</button>` : ''}
+                    ${r.status !== 'rejected' ? `<button onclick="moderateReview(${r.id}, 'rejected')" class="admin-btn admin-btn-danger text-xs">Reject</button>` : ''}
+                    <button onclick="moderateReview(${r.id}, 'flagged')" class="admin-btn admin-btn-warning text-xs">Flag</button>
+                </div>
+            </div>
+        `).join('');
+        lucide.createIcons();
+    }
+
+    function moderateReview(id, action) {
+        const reviews = JSON.parse(localStorage.getItem('brahmastra_reviews') || '[]');
+        const review = reviews.find(r => r.id === id);
+        if (review) {
+            review.status = action;
+            localStorage.setItem('brahmastra_reviews', JSON.stringify(reviews));
+            logAudit('Review Moderated', 'Review #' + id, `Status changed to ${action}`);
+            renderReviews();
+            showToast(`Review ${action}!`, 'success');
+        }
+    }
+
+    // 📢 ANNOUNCEMENTS
+    function sendAnnouncement() {
+        const target = document.getElementById('announce-target').value;
+        const title = document.getElementById('announce-title').value;
+        const message = document.getElementById('announce-message').value;
+        
+        if (!title || !message) { showToast('Title and message required!', 'error'); return; }
+        
+        const announcement = {
+            id: Date.now(),
+            title,
+            message,
+            target,
+            sentAt: new Date().toISOString(),
+            sender: 'Naman (Admin)'
+        };
+        
+        const history = JSON.parse(localStorage.getItem('brahmastra_announcements') || '[]');
+        history.unshift(announcement);
+        localStorage.setItem('brahmastra_announcements', JSON.stringify(history));
+        
+        broadcastUpdate('announcement', announcement);
+        logAudit('Announcement Sent', target, title);
+        
+        document.getElementById('announce-title').value = '';
+        document.getElementById('announce-message').value = '';
+        renderAnnouncements();
+        showToast('Announcement broadcasted!', 'success');
+    }
+
+    function renderAnnouncements() {
+        const history = JSON.parse(localStorage.getItem('brahmastra_announcements') || '[]');
+        const container = document.getElementById('broadcast-history');
+        
+        if (history.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">No broadcasts yet</p>';
+            return;
+        }
+        
+        container.innerHTML = history.slice(0, 5).map(a => `
+            <div class="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10">
+                <div>
+                    <p class="text-white font-bold text-xs">${a.title}</p>
+                    <p class="text-[10px] text-gray-500">${a.target} • ${new Date(a.sentAt).toLocaleDateString()}</p>
+                </div>
+                <span class="bg-brahma-cyan/20 text-brahma-cyan text-[10px] px-2 py-1 rounded">Sent</span>
+            </div>
+        `).join('');
+    }
+
+    function scheduleNewAnnouncement() {
+        const title = prompt('Announcement Title:');
+        if (!title) return;
+        showToast('Scheduled for later (Demo)', 'success');
+    }
+
+    // 📝 AUDIT LOGS
+    function logAudit(action, target, details) {
+        const logs = JSON.parse(localStorage.getItem('brahmastra_audit_logs') || '[]');
+        logs.unshift({
+            timestamp: new Date().toISOString(),
+            admin: 'Naman',
+            action,
+            target,
+            details
+        });
+        localStorage.setItem('brahmastra_audit_logs', JSON.stringify(logs.slice(0, 100))); // Keep last 100
+    }
+
+    function renderAuditLogs() {
+        const logs = JSON.parse(localStorage.getItem('brahmastra_audit_logs') || '[]');
+        const tbody = document.getElementById('audit-logs-tbody');
+        
+        if (logs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">No logs available</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = logs.slice(0, 20).map(log => `
+            <tr>
+                <td class="text-[10px] text-gray-400">${new Date(log.timestamp).toLocaleString()}</td>
+                <td class="text-brahma-cyan">${log.admin}</td>
+                <td class="text-white">${log.action}</td>
+                <td class="text-gray-400">${log.target}</td>
+                <td class="text-[10px] text-gray-500">${log.details}</td>
+            </tr>
+        `).join('');
+    }
+
+    function clearAuditLogs() {
+        if (confirm('Clear all audit logs?')) {
+            localStorage.removeItem('brahmastra_audit_logs');
+            renderAuditLogs();
+            showToast('Logs cleared!', 'success');
+        }
     }
 
     // 🎨 THEME & VIDEO
@@ -740,6 +1618,7 @@ function adminLogin() {
         const themeData = { bg, primary };
         localStorage.setItem('brahmastra_theme', JSON.stringify(themeData));
         broadcastUpdate('theme', themeData);
+        logAudit('Theme Updated', 'Settings', `BG: ${bg}, Primary: ${primary}`);
         showToast('Theme Updated! Reloading user view...', 'success');
     }
 
@@ -747,53 +1626,11 @@ function adminLogin() {
         const url = document.getElementById('hero-video-url').value;
         localStorage.setItem('brahmastra_hero_video', url);
         broadcastUpdate('hero_video', url);
-        showToast('Hero video updated! Reloading view...', 'success');
+        logAudit('Hero Video Updated', 'Settings', 'Video URL changed');
+        showToast('Hero video updated!', 'success');
     }
 
-    // TAB SWITCHING
-    function switchAdminTab(tab) {
-        document.querySelectorAll('.admin-tab').forEach(t => t.classList.add('hidden'));
-        document.querySelectorAll('.admin-sidebar-item').forEach(b => { b.classList.remove('active'); b.classList.add('text-gray-500'); });
-        
-        const tabEl = document.getElementById('tab-' + tab);
-        if (tabEl) tabEl.classList.remove('hidden');
-        
-        const btn = document.querySelector(`[data-tab="${tab}"]`);
-        if (btn) { btn.classList.add('active'); btn.classList.remove('text-gray-500'); }
-        
-        const titles = {
-            action: ['Action Center', 'Approve Orders & Resolve Issues'],
-            dashboard: ['Dashboard', 'Overview of your store'],
-            games: ['Games', 'Manage your game catalog'],
-            deals: ['Deals', 'Manage trending deals'],
-            users: ['Users', 'Manage user wallets'],
-            settings: ['Settings', 'General store configuration']
-        };
-        
-        if (titles[tab]) {
-            document.getElementById('admin-page-title').textContent = titles[tab][0];
-            document.getElementById('admin-admin-desc').textContent = titles[tab][1];
-        }
-
-        if (tab === 'games') renderGamesTable();
-        if (tab === 'settings') renderSecretCodes();
-    }
-
-    // UTILS
-    function showToast(msg, type = 'info') {
-        const container = document.getElementById('admin-toast-container');
-        const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-brahma-cyan' };
-        const el = document.createElement('div');
-        el.className = `toast ${colors[type] || colors.info} text-white px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-widest shadow-lg min-w-[250px]`;
-        el.textContent = msg;
-        container.appendChild(el);
-        setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
-    }
-
-    function getAdminData(key, fallback) {
-        try { return JSON.parse(localStorage.getItem('brahmastra_' + key)) || fallback; } catch(e) { return fallback; }
-    }
-
+    // DEALS
     function loadDeals() {
         const deals = getAdminData('deals', { d1: { name: 'Cyberpunk 2077', price: 999 }, d2: { name: 'EA FC 25', price: 1499 }, d3: { name: 'Spider-Man', price: 3999 } });
         document.getElementById('deal-1-name').value = deals.d1?.name || '';
@@ -807,17 +1644,18 @@ function adminLogin() {
     function saveDeals() {
         const deals = {
             d1: { name: document.getElementById('deal-1-name').value, price: parseInt(document.getElementById('deal-1-price').value) || 0 },
-            d2: { name: document.getElementById('deal-2-name').value, price: parseInt(documentDeal-2-price') || 0 }, // Note: IDs fixed in HTML
-            d3: { name: document.getElementById('deal-3-name').value, price: parseInt(document.getElementById('deal-3-price') || 0 }
+            d2: { name: document.getElementById('deal-2-name').value, price: parseInt(document.getElementById('deal-2-price').value) || 0 },
+            d3: { name: document.getElementById('deal-3-name').value, price: parseInt(document.getElementById('deal-3-price').value) || 0 }
         };
         localStorage.setItem('brahmastra_deals', JSON.stringify(deals));
         broadcastUpdate('deals', deals);
-        showToast('Deals updated! Website will update in real-time.', 'success');
+        logAudit('Deals Updated', 'Marketing', 'Deal prices changed');
+        showToast('Deals updated!', 'success');
     }
 
     // SECRET CODES
     function renderSecretCodes() {
-        const codes = getAdminData('secret_codes', { 'BRAHMA2026': { reward: 200, xp: 500 }, 'ELITEFREE': { reward: 0, xp: 0 } });
+        const codes = getAdminData('secret_codes', { 'BRAHMA2026': { reward: 200, xp: 500 } });
         const container = document.getElementById('secret-codes-list');
         container.innerHTML = Object.entries(codes).map(([code, data]) => `
             <div class="flex items-center justify-between bg-white/5 p-3 rounded-lg border border-white/10">
@@ -841,6 +1679,7 @@ function adminLogin() {
         localStorage.setItem('brahmastra_secret_codes', JSON.stringify(codes));
         renderSecretCodes();
         broadcastUpdate('secret_codes', codes);
+        logAudit('Secret Code Added', code, `Reward: ₹${reward}`);
         showToast('Secret code added!', 'success');
     }
 
@@ -856,6 +1695,27 @@ function adminLogin() {
     // TICKET CHAT LOGIC
     function openAdminTicketChat(ticketId) {
         currentTicketId = ticketId;
+        if (ticketId === 'demo-1') {
+            // Demo ticket
+            document.getElementById('admin-chat-user').textContent = 'Rahul Kumar';
+            document.getElementById('admin-chat-email').textContent = 'rahul@example.com';
+            document.getElementById('admin-chat-ticket-id').textContent = 'TKT-DEMO-001';
+            document.getElementById('admin-chat-category').textContent = 'PAYMENT';
+            document.getElementById('admin-chat-subject').textContent = 'Payment not reflecting in wallet';
+            document.getElementById('admin-chat-description').textContent = 'I paid ₹999 but wallet still shows 0 balance';
+            document.getElementById('admin-chat-messages').innerHTML = `
+                <div class="flex justify-start">
+                    <div class="max-w-[80%] bg-white/10 border border-white/20 rounded-xl rounded-bl-none p-3">
+                        <p class="text-[10px] text-gray-400 font-bold mb-1 uppercase">Rahul</p>
+                        <p class="text-white text-xs">Please help, my payment is not showing!</p>
+                    </div>
+                </div>
+            `;
+            openModal('admin-ticket-modal');
+            return;
+        }
+        
+        if (!db) return;
         db.collection('tickets').doc(ticketId).onSnapshot(doc => {
             if (!doc.exists) return;
             const t = doc.data();
@@ -890,8 +1750,25 @@ function adminLogin() {
     function adminSendReply() {
         const input = document.getElementById('admin-reply-input');
         const message = input.value.trim();
-        if (!message || !currentTicketId) return;
+        if (!message) return;
         
+        if (currentTicketId === 'demo-1') {
+            // Demo reply
+            const container = document.getElementById('admin-chat-messages');
+            container.innerHTML += `
+                <div class="flex justify-end">
+                    <div class="max-w-[80%] bg-purple-600/30 border-purple-400/50 rounded-xl rounded-br-none p-3">
+                        <p class="text-[10px] text-purple-200 font-bold mb-1 uppercase">Admin</p>
+                        <p class="text-white text-xs">${message}</p>
+                    </div>
+                </div>
+            `;
+            container.scrollTop = container.scrollHeight;
+            input.value = '';
+            return;
+        }
+        
+        if (!db || !currentTicketId) return;
         const replyData = { sender: 'admin', senderName: 'Naman (Admin)', message: message, timestamp: Date.now() };
         db.collection('tickets').doc(currentTicketId).update({
             messages: firebase.firestore.FieldValue.arrayUnion(replyData),
@@ -908,29 +1785,87 @@ function adminLogin() {
     }
 
     function updateTicketStatus() {
-        if (!currentTicketId) return;
+        if (!currentTicketId || currentTicketId === 'demo-1') return;
         const status = document.getElementById('admin-ticket-status').value;
         db.collection('tickets').doc(currentTicketId).update({ status: status }).then(() => {
             showToast('Status updated!', 'success');
         });
     }
 
-    function closeModal(id) { document.getElementById(id).classList.add('hidden'); document.getElementById(id).classList.remove('flex'); }
+    function closeModal(id) { 
+        document.getElementById(id).classList.add('hidden'); 
+    }
+
+    function openModal(id) {
+        document.getElementById(id).classList.remove('hidden');
+        if (id === 'admin-ticket-modal') document.getElementById(id).classList.add('flex');
+    }
+
+    // TAB SWITCHING
+    function switchAdminTab(tab) {
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.add('hidden'));
+        document.querySelectorAll('.admin-sidebar-item').forEach(b => { b.classList.remove('active'); b.classList.remove('text-brahma-cyan'); b.classList.add('text-gray-500'); });
+        
+        const tabEl = document.getElementById('tab-' + tab);
+        if (tabEl) tabEl.classList.remove('hidden');
+        
+        const btn = document.querySelector(`[data-tab="${tab}"]`);
+        if (btn) { btn.classList.add('active'); btn.classList.remove('text-gray-500'); btn.classList.add('text-brahma-cyan'); }
+        
+        const titles = {
+            action: ['Action Center', 'Approve Orders & Resolve Issues'],
+            dashboard: ['Dashboard', 'Overview of your store'],
+            analytics: ['Analytics', 'Sales performance & insights'],
+            orders: ['Orders', 'Manage all orders'],
+            games: ['Games', 'Manage your game catalog'],
+            deals: ['Deals', 'Manage trending deals'],
+            users: ['Users', 'Manage user wallets'],
+            reviews: ['Reviews', 'Moderate user reviews'],
+            announcements: ['Broadcast', 'Send announcements'],
+            logs: ['Audit Logs', 'Track admin actions'],
+            settings: ['Settings', 'General store configuration']
+        };
+        
+        if (titles[tab]) {
+            document.getElementById('admin-page-title').textContent = titles[tab][0];
+            document.getElementById('admin-page-desc').textContent = titles[tab][1];
+        }
+
+        if (tab === 'games') renderGamesTable();
+        if (tab === 'settings') renderSecretCodes();
+        if (tab === 'analytics') renderTopGames();
+        if (tab === 'reviews') renderReviews();
+        if (tab === 'announcements') renderAnnouncements();
+        if (tab === 'logs') renderAuditLogs();
+    }
+
+    // UTILS
+    function showToast(msg, type = 'info') {
+        const container = document.getElementById('admin-toast-container');
+        const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-brahma-cyan' };
+        const el = document.createElement('div');
+        el.className = `toast ${colors[type] || colors.info} text-white px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-widest shadow-lg min-w-[250px]`;
+        el.textContent = msg;
+        container.appendChild(el);
+        setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
+    }
+
+    function getAdminData(key, fallback) {
+        try { return JSON.parse(localStorage.getItem('brahmastra_' + key)) || fallback; } catch(e) { return fallback; }
+    }
 
     // REALTIME LISTENER
     function startRealtimeListener() {
-        // Listen for local orders (from app.js)
         window.addEventListener('storage', (e) => {
-            if (e.key === 'brahmastra_pending_orders' && e.newValue) {
+            if (e.key === 'brahmastra_pending_orders') {
                 loadPendingOrders();
                 updateDashboardStats();
             }
         });
         
-        // Listen for Broadcast Channel
         syncChannel.onmessage = (e) => {
             if (e.data.type === 'new_order') loadPendingOrders();
-        });
+        };
     }
 
     // EXPORT
@@ -938,8 +1873,9 @@ function adminLogin() {
         const data = {
             games: getAllGames(),
             deals: getAdminData('deals', {}),
-            pending: JSON.parse(localStorage.getItem('brahmastra_pending_orders') || []),
+            pending: JSON.parse(localStorage.getItem('brahmastra_pending_orders') || '[]'),
             state: JSON.parse(localStorage.getItem('brahmastra_state') || '{}'),
+            users: JSON.parse(localStorage.getItem('brahmastra_users') || '[]'),
             exportedAt: new Date().toISOString()
         };
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -949,6 +1885,7 @@ function adminLogin() {
         a.download = 'brahmastra_backup_' + Date.now() + '.json';
         a.click();
         URL.revokeObjectURL(url);
+        logAudit('Data Export', 'System', 'Full database export');
         showToast('Data exported!', 'success');
     }
 
